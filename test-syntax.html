@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Syntax Test</title>
+</head>
+<body>
+    <h1>Testing JavaScript Syntax</h1>
+    <div id="result"></div>
+    
+    <script src="app.js"></script>
+    <script>
+        try {
+            console.log('Testing TheiaJewelzApp class...');
+            if (typeof TheiaJewelzApp !== 'undefined') {
+                console.log('✅ TheiaJewelzApp class is defined');
+                document.getElementById('result').innerHTML = '✅ TheiaJewelzApp class is defined';
+            } else {
+                console.log('❌ TheiaJewelzApp class is not defined');
+                document.getElementById('result').innerHTML = '❌ TheiaJewelzApp class is not defined';
+            }
+        } catch (error) {
+            console.error('❌ JavaScript error:', error);
+            document.getElementById('result').innerHTML = '❌ JavaScript error: ' + error.message;
+        }
+    </script>
+</body>
+</html>

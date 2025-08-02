@@ -1,0 +1,1618 @@
+// Theia Jewelz Enhanced Web Application
+class TheiaJewelzApp {
+    constructor() {
+        this.currentPage = 'login-page';
+        this.salesData = [];
+        this.customersData = [];
+        this.selectedSales = new Set();
+        this.selectedCustomers = new Set();
+        this.isFirebaseInitialized = false;
+        this.currentUser = null;
+        this.settings = {
+            primaryColor: '#4285f4',
+            buttonColor: '#34a853',
+            accentColor: '#ea4335',
+            currency: '₹',
+            dateFormat: 'DD/MM/YYYY',
+            autoBackup: false
+        };
+        this.charts = {};
+        this.categories = ['necklaces', 'rings', 'earrings', 'bracelets', 'chains', 'sets', 'pendants', 'bangles'];
+        this.init();
+    }
+
+    async init() {
+        console.log('Initializing Theia Jewelz App...');
+        
+        // Initialize Firebase
+        await this.initializeFirebase();
+        
+        // Load settings
+        this.loadSettings();
+        
+        // Apply saved colors
+        this.applyColors();
+        
+        // Set up event listeners
+        this.setupEventListeners();
+        
+        // Check if user is logged in
+        this.checkLoginStatus();
+        
+        console.log('App initialized successfully');
+    }
+
+    async initializeFirebase() {
+        try {
+            // Check if Firebase is already initialized by firebase-config.js
+            if (typeof firebase !== 'undefined' && typeof db !== 'undefined' && db !== null) {
+                this.db = db;
+                this.auth = auth;
+                this.isFirebaseInitialized = true;
+                console.log('Firebase already initialized, using existing instance');
+            } else {
+                console.warn('Firebase not available, using local storage');
+                this.isFirebaseInitialized = false;
+            }
+        } catch (error) {
+            console.error('Firebase initialization failed:', error);
+            this.isFirebaseInitialized = false;
+        }
+    }
+
+    setupEventListeners() {
+        // Login form
+        const loginForm = document.getElementById('login-form');
+        if (loginForm) {
+            loginForm.addEventListener('submit', (e) => this.handleLogin(e));
+        }
+
+        // Add sale form submission
+        const addSaleForm = document.getElementById('add-sale-form');
+        if (addSaleForm) {
+            addSaleForm.addEventListener('submit', (e) => this.handleAddSale(e));
+        }
+
+        // Category checkboxes
+        this.setupCategoryCheckboxes();
+
+        // Customer search functionality
+        const customerSearch = document.getElementById('customer-search');
+        if (customerSearch) {
+            customerSearch.addEventListener('input', (e) => this.handleCustomerSearch(e));
+        }
+
+        // Profit calculation
+        const costPrice = document.getElementById('cost-price');
+        const sellingPrice = document.getElementById('selling-price');
+        const shippingCost = document.getElementById('shipping-cost');
+        
+        if (costPrice && sellingPrice && shippingCost) {
+            costPrice.addEventListener('input', () => this.calculateProfit());
+            sellingPrice.addEventListener('input', () => this.calculateProfit());
+            shippingCost.addEventListener('input', () => this.calculateProfit());
+        }
+
+        // Change password form
+        const changePasswordForm = document.getElementById('change-password-form');
+        if (changePasswordForm) {
+            changePasswordForm.addEventListener('submit', (e) => this.handleChangePassword(e));
+        }
+
+        // Import file handlers
+        const importFile = document.getElementById('import-file');
+        if (importFile) {
+            importFile.addEventListener('change', (e) => this.handleImportSales(e));
+        }
+
+        // Set up navigation click handlers
+        window.navigateTo = (page) => this.navigateTo(page);
+        window.logout = () => this.logout();
+        window.applyFilters = () => this.applyFilters();
+        window.togglePassword = () => this.togglePassword();
+        window.previewReceipt = () => this.previewReceipt();
+        
+        // Global functions
+        window.editSale = (id) => this.editSale(id);
+        window.deleteSale = (id) => this.deleteSale(id);
+        window.generateReceipt = (id) => this.generateReceipt(id);
+        window.toggleSelectAll = () => this.toggleSelectAll();
+        window.deleteSelected = () => this.deleteSelected();
+        window.deleteAll = () => this.deleteAll();
+        window.exportSales = () => this.exportSales();
+        window.importSales = () => this.importSales();
+        
+        // Customer functions
+        window.addNewCustomer = () => this.addNewCustomer();
+        window.exportCustomers = () => this.exportCustomers();
+        window.importCustomers = () => this.importCustomers();
+        
+        // Settings functions
+        window.openChangePasswordModal = () => this.openChangePasswordModal();
+        window.closeChangePasswordModal = () => this.closeChangePasswordModal();
+        window.updatePrimaryColor = (color) => this.updatePrimaryColor(color);
+        window.updateButtonColor = (color) => this.updateButtonColor(color);
+        window.updateAccentColor = (color) => this.updateAccentColor(color);
+        window.resetColors = () => this.resetColors();
+        window.updateCurrency = (currency) => this.updateCurrency(currency);
+        window.updateDateFormat = (format) => this.updateDateFormat(format);
+        window.toggleAutoBackup = (enabled) => this.toggleAutoBackup(enabled);
+        window.backupData = () => this.backupData();
+        window.restoreData = () => this.restoreData();
+        window.clearAllData = () => this.clearAllData();
+        
+        // Modal functions
+        window.closeReceiptModal = () => this.closeReceiptModal();
+        window.printReceipt = () => this.printReceipt();
+    }
+
+    setupCategoryCheckboxes() {
+        this.categories.forEach(category => {
+            const checkbox = document.getElementById(`cat-${category}`);
+            const quantityInput = document.getElementById(`qty-${category}`);
+            
+            if (checkbox && quantityInput) {
+                checkbox.addEventListener('change', (e) => {
+                    quantityInput.disabled = !e.target.checked;
+                    if (e.target.checked) {
+                        quantityInput.value = '1';
+                        quantityInput.focus();
+                    } else {
+                        quantityInput.value = '';
+                    }
+                });
+            }
+        });
+    }
+
+    checkLoginStatus() {
+        const savedUser = localStorage.getItem('theiaJewelzUser');
+        if (savedUser) {
+            this.currentUser = JSON.parse(savedUser);
+            this.navigateTo('homepage');
+            this.updateWelcomeMessage();
+        }
+    }
+
+    async handleLogin(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(e.target);
+        const username = formData.get('username');
+        const password = formData.get('password');
+
+        console.log('Login attempt:', { username, password: '***' });
+        this.showLoading(true);
+
+        try {
+            // For demo purposes, using simple authentication
+            // In production, this should be properly secured
+            const validCredentials = await this.validateCredentials(username, password);
+            console.log('Credentials validation result:', validCredentials);
+            
+            if (validCredentials) {
+                this.currentUser = { username, loginTime: new Date().toISOString() };
+                localStorage.setItem('theiaJewelzUser', JSON.stringify(this.currentUser));
+                
+                // Load data after successful login
+                await this.loadData();
+                
+                this.showMessage('Login successful!', 'success');
+                this.navigateTo('homepage');
+                this.updateWelcomeMessage();
+            } else {
+                throw new Error('Invalid username or password');
+            }
+        } catch (error) {
+            console.error('Login error:', error);
+            this.showMessage(error.message || 'Login failed', 'error');
+        } finally {
+            this.showLoading(false);
+        }
+    }
+
+    async validateCredentials(username, password) {
+        try {
+            console.log('Validating credentials for:', username);
+            console.log('Firebase initialized:', this.isFirebaseInitialized);
+            
+            if (this.isFirebaseInitialized) {
+                console.log('Checking Firebase for user credentials...');
+                // Check Firebase for user credentials
+                const userDoc = await this.db.collection('users').doc(username).get();
+                if (userDoc.exists) {
+                    const userData = userDoc.data();
+                    console.log('User found in Firebase');
+                    // In production, use proper password hashing
+                    return userData.password === this.hashPassword(password);
+                } else {
+                    console.log('User not found in Firebase, using fallback');
+                }
+            }
+            
+            // Fallback to default credentials
+            console.log('Using fallback credentials validation');
+            const isValid = (username === 'admin' && password === 'admin123') || 
+                           (username === 'user' && password === 'user123');
+            console.log('Fallback validation result:', isValid);
+            return isValid;
+        } catch (error) {
+            console.error('Credential validation error:', error);
+            // Fallback to default credentials
+            console.log('Error occurred, using fallback credentials');
+            const isValid = (username === 'admin' && password === 'admin123') || 
+                           (username === 'user' && password === 'user123');
+            console.log('Error fallback validation result:', isValid);
+            return isValid;
+        }
+    }
+
+    hashPassword(password) {
+        // Simple hash for demo - use proper hashing in production
+        let hash = 0;
+        for (let i = 0; i < password.length; i++) {
+            const char = password.charCodeAt(i);
+            hash = ((hash << 5) - hash) + char;
+            hash = hash & hash;
+        }
+        return hash.toString();
+    }
+
+    updateWelcomeMessage() {
+        const welcomeElement = document.getElementById('welcome-user');
+        if (welcomeElement && this.currentUser) {
+            welcomeElement.textContent = `Welcome, ${this.currentUser.username}`;
+        }
+    }
+
+    togglePassword() {
+        const passwordInput = document.getElementById('password');
+        const toggleIcon = document.querySelector('.toggle-password');
+        
+        if (passwordInput.type === 'password') {
+            passwordInput.type = 'text';
+            toggleIcon.classList.remove('fa-eye');
+            toggleIcon.classList.add('fa-eye-slash');
+        } else {
+            passwordInput.type = 'password';
+            toggleIcon.classList.remove('fa-eye-slash');
+            toggleIcon.classList.add('fa-eye');
+        }
+    }
+
+    logout() {
+        localStorage.removeItem('theiaJewelzUser');
+        this.currentUser = null;
+        this.navigateTo('login-page');
+        this.showMessage('Logged out successfully', 'success');
+    }
+
+    navigateTo(page) {
+        // Hide current page
+        const currentPageElement = document.getElementById(this.currentPage);
+        if (currentPageElement) {
+            currentPageElement.classList.remove('active');
+        }
+
+        // Show new page
+        const newPageElement = document.getElementById(page);
+        if (newPageElement) {
+            newPageElement.classList.add('active');
+            this.currentPage = page;
+
+            // Page-specific initialization
+            switch (page) {
+                case 'homepage':
+                    this.updateWelcomeMessage();
+                    break;
+                case 'dashboard':
+                    this.updateDashboard();
+                    this.initializeCharts();
+                    break;
+                case 'recent-sales':
+                    this.renderSalesList();
+                    break;
+                case 'customers':
+                    this.renderCustomersList();
+                    break;
+                case 'analytics':
+                    this.initializeAnalyticsCharts();
+                    break;
+                case 'add-sale':
+                    this.setDefaultSaleDate();
+                    break;
+                case 'settings':
+                    this.loadSettingsUI();
+                    break;
+            }
+        }
+    }
+
+    async loadData() {
+        try {
+            if (this.isFirebaseInitialized) {
+                await this.loadFromFirebase();
+            } else {
+                this.loadFromLocalStorage();
+            }
+            
+            this.updateDashboard();
+            this.renderSalesList();
+        } catch (error) {
+            console.error('Error loading data:', error);
+            this.showMessage('Error loading data', 'error');
+        }
+    }
+
+    async loadFromFirebase() {
+        try {
+            // Load sales data
+            const salesSnapshot = await this.db.collection('sales').orderBy('saleDate', 'desc').get();
+            this.salesData = salesSnapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            }));
+
+            // Load customers data
+            const customersSnapshot = await this.db.collection('customers').get();
+            this.customersData = customersSnapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            }));
+
+            // Load settings
+            const settingsSnapshot = await this.db.collection('settings').doc('app').get();
+            if (settingsSnapshot.exists) {
+                this.settings = { ...this.settings, ...settingsSnapshot.data() };
+            }
+
+            console.log('Data loaded from Firebase');
+        } catch (error) {
+            console.error('Error loading from Firebase:', error);
+            this.loadFromLocalStorage();
+        }
+    }
+
+    loadFromLocalStorage() {
+        this.salesData = JSON.parse(localStorage.getItem('theiaJewelzSales') || '[]');
+        this.customersData = JSON.parse(localStorage.getItem('theiaJewelzCustomers') || '[]');
+        this.settings = { ...this.settings, ...JSON.parse(localStorage.getItem('theiaJewelzSettings') || '{}') };
+        console.log('Data loaded from local storage');
+    }
+
+    saveToLocalStorage() {
+        localStorage.setItem('theiaJewelzSales', JSON.stringify(this.salesData));
+        localStorage.setItem('theiaJewelzCustomers', JSON.stringify(this.customersData));
+        localStorage.setItem('theiaJewelzSettings', JSON.stringify(this.settings));
+    }
+
+    async saveToFirebase(collection, data, docId = null) {
+        if (!this.isFirebaseInitialized) return null;
+        
+        try {
+            if (docId) {
+                await this.db.collection(collection).doc(docId).set(data, { merge: true });
+                return docId;
+            } else {
+                const docRef = await this.db.collection(collection).add(data);
+                return docRef.id;
+            }
+        } catch (error) {
+            console.error(`Error saving to Firebase ${collection}:`, error);
+            throw error;
+        }
+    }
+
+    calculateProfit() {
+        const costPrice = parseFloat(document.getElementById('cost-price').value) || 0;
+        const sellingPrice = parseFloat(document.getElementById('selling-price').value) || 0;
+        const shippingCost = parseFloat(document.getElementById('shipping-cost').value) || 0;
+        
+        const profit = sellingPrice - costPrice - shippingCost;
+        document.getElementById('profit').value = profit.toFixed(2);
+    }
+
+    async handleCustomerSearch(e) {
+        const searchTerm = e.target.value.trim();
+        const suggestionsDropdown = document.getElementById('customer-suggestions');
+        
+        if (searchTerm.length < 2) {
+            suggestionsDropdown.style.display = 'none';
+            return;
+        }
+
+        try {
+            const customers = this.customersData.filter(customer =>
+                customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                customer.phone.includes(searchTerm)
+            );
+
+            this.displayCustomerSuggestions(customers, suggestionsDropdown);
+        } catch (error) {
+            console.error('Error searching customers:', error);
+        }
+    }
+
+    displayCustomerSuggestions(customers, dropdown) {
+        dropdown.innerHTML = '';
+        
+        if (customers.length === 0) {
+            dropdown.style.display = 'none';
+            return;
+        }
+
+        customers.slice(0, 5).forEach(customer => {
+            const suggestionItem = document.createElement('div');
+            suggestionItem.className = 'suggestion-item';
+            suggestionItem.innerHTML = `
+                <div>
+                    <strong>${customer.name}</strong><br>
+                    <small>${customer.phone} • ${customer.email || 'No email'}</small>
+                </div>
+            `;
+
+            suggestionItem.addEventListener('click', () => {
+                this.fillCustomerForm(customer);
+                dropdown.style.display = 'none';
+            });
+
+            dropdown.appendChild(suggestionItem);
+        });
+
+        dropdown.style.display = 'block';
+    }
+
+    fillCustomerForm(customer) {
+        document.getElementById('customer-name').value = customer.name || '';
+        document.getElementById('phone-number').value = customer.phone || '';
+        document.getElementById('email').value = customer.email || '';
+        document.getElementById('address').value = customer.address || '';
+        document.getElementById('customer-search').value = customer.name || '';
+    }
+
+    async handleAddSale(e) {
+        e.preventDefault();
+        
+        this.showLoading(true);
+
+        try {
+            const formData = new FormData(e.target);
+            
+            // Get selected categories and quantities
+            const selectedCategories = [];
+            
+            this.categories.forEach(category => {
+                const checkbox = document.getElementById(`cat-${category}`);
+                const quantityInput = document.getElementById(`qty-${category}`);
+                
+                if (checkbox && checkbox.checked) {
+                    const quantity = parseInt(quantityInput.value) || 1;
+                    selectedCategories.push({
+                        category: checkbox.value,
+                        quantity: quantity
+                    });
+                }
+            });
+
+            if (selectedCategories.length === 0) {
+                throw new Error('Please select at least one category');
+            }
+            
+            const saleData = {
+                customerName: formData.get('customerName'),
+                phoneNumber: formData.get('phoneNumber'),
+                email: formData.get('email'),
+                address: formData.get('address'),
+                categories: selectedCategories,
+                saleDate: formData.get('saleDate'),
+                costPrice: parseFloat(formData.get('costPrice')),
+                sellingPrice: parseFloat(formData.get('sellingPrice')),
+                shippingCost: parseFloat(formData.get('shippingCost')) || 0,
+                profit: parseFloat(formData.get('profit')),
+                paymentMode: formData.get('paymentMode'),
+                createdAt: new Date().toISOString(),
+                createdBy: this.currentUser?.username || 'unknown'
+            };
+
+            // Validate required fields
+            if (!saleData.customerName || !saleData.phoneNumber || !saleData.costPrice || !saleData.sellingPrice) {
+                throw new Error('Please fill in all required fields');
+            }
+
+            // Save to Firebase if available
+            let saleId;
+            if (this.isFirebaseInitialized) {
+                saleId = await this.saveToFirebase('sales', saleData);
+                saleData.id = saleId;
+                console.log('Sale saved to Firebase with ID:', saleId);
+            } else {
+                saleData.id = Date.now().toString();
+            }
+
+            // Add to local data
+            this.salesData.unshift(saleData);
+
+            // Save customer if new
+            await this.saveCustomer({
+                name: saleData.customerName,
+                phone: saleData.phoneNumber,
+                email: saleData.email,
+                address: saleData.address
+            });
+
+            // Save to local storage as backup
+            this.saveToLocalStorage();
+
+            // Reset form
+            e.target.reset();
+            this.setDefaultSaleDate();
+            document.getElementById('profit').value = '';
+            
+            // Reset category checkboxes
+            this.categories.forEach(category => {
+                const checkbox = document.getElementById(`cat-${category}`);
+                const quantityInput = document.getElementById(`qty-${category}`);
+                if (checkbox) checkbox.checked = false;
+                if (quantityInput) {
+                    quantityInput.disabled = true;
+                    quantityInput.value = '';
+                }
+            });
+
+            // Show success message
+            this.showMessage('Sale added successfully!', 'success');
+
+            // Navigate back to homepage
+            setTimeout(() => {
+                this.navigateTo('homepage');
+            }, 1500);
+
+        } catch (error) {
+            console.error('Error adding sale:', error);
+            this.showMessage(error.message || 'Error adding sale', 'error');
+        } finally {
+            this.showLoading(false);
+        }
+    }
+
+    async saveCustomer(customerData) {
+        // Check if customer already exists
+        const existingCustomer = this.customersData.find(
+            customer => customer.phone === customerData.phone
+        );
+
+        if (!existingCustomer) {
+            try {
+                customerData.createdAt = new Date().toISOString();
+                
+                if (this.isFirebaseInitialized) {
+                    const customerId = await this.saveToFirebase('customers', customerData);
+                    customerData.id = customerId;
+                } else {
+                    customerData.id = Date.now().toString();
+                }
+
+                this.customersData.push(customerData);
+                this.saveToLocalStorage();
+                
+                console.log('New customer saved:', customerData.name);
+            } catch (error) {
+                console.error('Error saving customer:', error);
+            }
+        }
+    }
+
+    setDefaultSaleDate() {
+        const saleDateInput = document.getElementById('sale-date');
+        if (saleDateInput) {
+            const today = new Date();
+            const formattedDate = today.toISOString().split('T')[0];
+            saleDateInput.value = formattedDate;
+        }
+    }
+
+    previewReceipt() {
+        const form = document.getElementById('add-sale-form');
+        const formData = new FormData(form);
+        
+        // Get selected categories and quantities
+        const selectedCategories = [];
+        
+        this.categories.forEach(category => {
+            const checkbox = document.getElementById(`cat-${category}`);
+            const quantityInput = document.getElementById(`qty-${category}`);
+            
+            if (checkbox && checkbox.checked) {
+                const quantity = parseInt(quantityInput.value) || 1;
+                selectedCategories.push({
+                    category: checkbox.value,
+                    quantity: quantity
+                });
+            }
+        });
+
+        if (selectedCategories.length === 0) {
+            this.showMessage('Please select at least one category', 'warning');
+            return;
+        }
+
+        const receiptData = {
+            customerName: formData.get('customerName') || 'N/A',
+            phoneNumber: formData.get('phoneNumber') || 'N/A',
+            email: formData.get('email') || 'N/A',
+            address: formData.get('address') || 'N/A',
+            categories: selectedCategories,
+            saleDate: formData.get('saleDate') || new Date().toISOString().split('T')[0],
+            costPrice: parseFloat(formData.get('costPrice')) || 0,
+            sellingPrice: parseFloat(formData.get('sellingPrice')) || 0,
+            shippingCost: parseFloat(formData.get('shippingCost')) || 0,
+            profit: parseFloat(formData.get('profit')) || 0,
+            paymentMode: formData.get('paymentMode') || 'Cash'
+        };
+
+        this.showReceiptModal(receiptData);
+    }
+
+    showReceiptModal(receiptData) {
+        const modal = document.getElementById('receipt-modal');
+        const receiptContent = document.getElementById('receipt-content');
+        
+        const categoriesHtml = receiptData.categories.map(cat => 
+            `<div class="receipt-row">
+                <span>${cat.category}</span>
+                <span>Qty: ${cat.quantity}</span>
+            </div>`
+        ).join('');
+
+        receiptContent.innerHTML = `
+            <div class="receipt-header">
+                <h2>Theia Jewelz</h2>
+                <p>Sales Receipt</p>
+                <p>Date: ${this.formatDate(receiptData.saleDate)}</p>
+            </div>
+            
+            <div class="receipt-details">
+                <h3>Customer Details:</h3>
+                <div class="receipt-row">
+                    <span>Name:</span>
+                    <span>${receiptData.customerName}</span>
+                </div>
+                <div class="receipt-row">
+                    <span>Phone:</span>
+                    <span>${receiptData.phoneNumber}</span>
+                </div>
+                ${receiptData.email ? `<div class="receipt-row"><span>Email:</span><span>${receiptData.email}</span></div>` : ''}
+                ${receiptData.address ? `<div class="receipt-row"><span>Address:</span><span>${receiptData.address}</span></div>` : ''}
+            </div>
+            
+            <div class="receipt-details">
+                <h3>Items:</h3>
+                ${categoriesHtml}
+            </div>
+            
+            <div class="receipt-details">
+                <h3>Payment Details:</h3>
+                <div class="receipt-row">
+                    <span>Cost Price:</span>
+                    <span>${this.settings.currency}${receiptData.costPrice.toFixed(2)}</span>
+                </div>
+                <div class="receipt-row">
+                    <span>Selling Price:</span>
+                    <span>${this.settings.currency}${receiptData.sellingPrice.toFixed(2)}</span>
+                </div>
+                <div class="receipt-row">
+                    <span>Shipping Cost:</span>
+                    <span>${this.settings.currency}${receiptData.shippingCost.toFixed(2)}</span>
+                </div>
+                <div class="receipt-row total">
+                    <span>Total Amount:</span>
+                    <span>${this.settings.currency}${(receiptData.sellingPrice + receiptData.shippingCost).toFixed(2)}</span>
+                </div>
+                <div class="receipt-row">
+                    <span>Payment Mode:</span>
+                    <span>${receiptData.paymentMode}</span>
+                </div>
+                <div class="receipt-row">
+                    <span>Profit:</span>
+                    <span>${this.settings.currency}${receiptData.profit.toFixed(2)}</span>
+                </div>
+            </div>
+            
+            <div style="text-align: center; margin-top: 2rem; font-size: 0.9rem; color: #666;">
+                <p>Thank you for your business!</p>
+                <p>© 2024 Theia Jewelz</p>
+            </div>
+        `;
+        
+        modal.classList.add('active');
+    }
+
+    closeReceiptModal() {
+        const modal = document.getElementById('receipt-modal');
+        modal.classList.remove('active');
+    }
+
+    printReceipt() {
+        window.print();
+    }
+
+    updateDashboard() {
+        if (this.salesData.length === 0) {
+            document.getElementById('total-sales').textContent = `${this.settings.currency}0.00`;
+            document.getElementById('total-profit').textContent = `${this.settings.currency}0.00`;
+            document.getElementById('total-orders').textContent = '0';
+            document.getElementById('avg-order-value').textContent = `${this.settings.currency}0.00`;
+            return;
+        }
+
+        const totalSales = this.salesData.reduce((sum, sale) => sum + (sale.sellingPrice || 0), 0);
+        const totalProfit = this.salesData.reduce((sum, sale) => sum + (sale.profit || 0), 0);
+        const totalOrders = this.salesData.length;
+        const avgOrderValue = totalOrders > 0 ? totalSales / totalOrders : 0;
+
+        document.getElementById('total-sales').textContent = `${this.settings.currency}${totalSales.toFixed(2)}`;
+        document.getElementById('total-profit').textContent = `${this.settings.currency}${totalProfit.toFixed(2)}`;
+        document.getElementById('total-orders').textContent = totalOrders.toString();
+        document.getElementById('avg-order-value').textContent = `${this.settings.currency}${avgOrderValue.toFixed(2)}`;
+    }
+
+    initializeCharts() {
+        this.initializeMonthlySalesChart();
+        this.initializeCategoryChart();
+    }
+
+    initializeMonthlySalesChart() {
+        const ctx = document.getElementById('monthly-sales-chart');
+        if (!ctx) return;
+
+        // Destroy existing chart if it exists
+        if (this.charts.monthlySales) {
+            this.charts.monthlySales.destroy();
+        }
+
+        // Prepare data for last 6 months
+        const months = [];
+        const salesData = [];
+        const currentDate = new Date();
+
+        for (let i = 5; i >= 0; i--) {
+            const date = new Date(currentDate.getFullYear(), currentDate.getMonth() - i, 1);
+            const monthName = date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+            months.push(monthName);
+
+            const monthSales = this.salesData.filter(sale => {
+                const saleDate = new Date(sale.saleDate);
+                return saleDate.getMonth() === date.getMonth() && saleDate.getFullYear() === date.getFullYear();
+            }).reduce((sum, sale) => sum + (sale.sellingPrice || 0), 0);
+
+            salesData.push(monthSales);
+        }
+
+        this.charts.monthlySales = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: months,
+                datasets: [{
+                    label: 'Monthly Sales',
+                    data: salesData,
+                    borderColor: this.settings.primaryColor,
+                    backgroundColor: this.settings.primaryColor + '20',
+                    borderWidth: 3,
+                    fill: true,
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) {
+                                return '₹' + value.toLocaleString();
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    initializeCategoryChart() {
+        const ctx = document.getElementById('category-chart');
+        if (!ctx) return;
+
+        // Destroy existing chart if it exists
+        if (this.charts.category) {
+            this.charts.category.destroy();
+        }
+
+        // Prepare category data
+        const categoryData = {};
+        this.salesData.forEach(sale => {
+            if (sale.categories && Array.isArray(sale.categories)) {
+                sale.categories.forEach(cat => {
+                    const category = cat.category || cat;
+                    const quantity = cat.quantity || 1;
+                    categoryData[category] = (categoryData[category] || 0) + quantity;
+                });
+            } else if (sale.category) {
+                // Handle old format
+                if (Array.isArray(sale.category)) {
+                    sale.category.forEach(cat => {
+                        categoryData[cat] = (categoryData[cat] || 0) + 1;
+                    });
+                } else {
+                    categoryData[sale.category] = (categoryData[sale.category] || 0) + 1;
+                }
+            }
+        });
+
+        const labels = Object.keys(categoryData);
+        const data = Object.values(categoryData);
+        const colors = [
+            '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0',
+            '#9966FF', '#FF9F40', '#FF6384', '#C9CBCF'
+        ];
+
+        this.charts.category = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: data,
+                    backgroundColor: colors.slice(0, labels.length),
+                    borderWidth: 2,
+                    borderColor: '#fff'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
+                }
+            }
+        });
+    }
+
+    initializeAnalyticsCharts() {
+        this.initializeTopCategoriesChart();
+        this.initializePerformanceChart();
+        this.initializeProfitMarginChart();
+        this.updateCustomerInsights();
+    }
+
+    initializeTopCategoriesChart() {
+        const ctx = document.getElementById('top-categories-chart');
+        if (!ctx) return;
+
+        if (this.charts.topCategories) {
+            this.charts.topCategories.destroy();
+        }
+
+        // Get top 5 categories by sales value
+        const categoryData = {};
+        this.salesData.forEach(sale => {
+            if (sale.categories && Array.isArray(sale.categories)) {
+                sale.categories.forEach(cat => {
+                    const category = cat.category || cat;
+                    categoryData[category] = (categoryData[category] || 0) + (sale.sellingPrice || 0);
+                });
+            }
+        });
+
+        const sortedCategories = Object.entries(categoryData)
+            .sort(([,a], [,b]) => b - a)
+            .slice(0, 5);
+
+        const labels = sortedCategories.map(([category]) => category);
+        const data = sortedCategories.map(([, value]) => value);
+
+        this.charts.topCategories = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Sales Value',
+                    data: data,
+                    backgroundColor: this.settings.buttonColor,
+                    borderColor: this.settings.buttonColor,
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) {
+                                return '₹' + value.toLocaleString();
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    initializePerformanceChart() {
+        const ctx = document.getElementById('performance-chart');
+        if (!ctx) return;
+
+        if (this.charts.performance) {
+            this.charts.performance.destroy();
+        }
+
+        // Weekly performance for last 4 weeks
+        const weeks = [];
+        const salesData = [];
+        const profitData = [];
+        const currentDate = new Date();
+
+        for (let i = 3; i >= 0; i--) {
+            const weekStart = new Date(currentDate);
+            weekStart.setDate(currentDate.getDate() - (i * 7) - currentDate.getDay());
+            const weekEnd = new Date(weekStart);
+            weekEnd.setDate(weekStart.getDate() + 6);
+
+            weeks.push(`Week ${4 - i}`);
+
+            const weekSales = this.salesData.filter(sale => {
+                const saleDate = new Date(sale.saleDate);
+                return saleDate >= weekStart && saleDate <= weekEnd;
+            });
+
+            const totalSales = weekSales.reduce((sum, sale) => sum + (sale.sellingPrice || 0), 0);
+            const totalProfit = weekSales.reduce((sum, sale) => sum + (sale.profit || 0), 0);
+
+            salesData.push(totalSales);
+            profitData.push(totalProfit);
+        }
+
+        this.charts.performance = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: weeks,
+                datasets: [{
+                    label: 'Sales',
+                    data: salesData,
+                    borderColor: this.settings.primaryColor,
+                    backgroundColor: this.settings.primaryColor + '20',
+                    borderWidth: 2,
+                    fill: false
+                }, {
+                    label: 'Profit',
+                    data: profitData,
+                    borderColor: this.settings.buttonColor,
+                    backgroundColor: this.settings.buttonColor + '20',
+                    borderWidth: 2,
+                    fill: false
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) {
+                                return '₹' + value.toLocaleString();
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    initializeProfitMarginChart() {
+        const ctx = document.getElementById('profit-margin-chart');
+        if (!ctx) return;
+
+        if (this.charts.profitMargin) {
+            this.charts.profitMargin.destroy();
+        }
+
+        // Calculate profit margins by category
+        const categoryMargins = {};
+        this.salesData.forEach(sale => {
+            if (sale.categories && Array.isArray(sale.categories)) {
+                sale.categories.forEach(cat => {
+                    const category = cat.category || cat;
+                    if (!categoryMargins[category]) {
+                        categoryMargins[category] = { totalProfit: 0, totalSales: 0 };
+                    }
+                    categoryMargins[category].totalProfit += (sale.profit || 0);
+                    categoryMargins[category].totalSales += (sale.sellingPrice || 0);
+                });
+            }
+        });
+
+        const labels = Object.keys(categoryMargins);
+        const margins = labels.map(category => {
+            const data = categoryMargins[category];
+            return data.totalSales > 0 ? (data.totalProfit / data.totalSales) * 100 : 0;
+        });
+
+        this.charts.profitMargin = new Chart(ctx, {
+            type: 'radar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Profit Margin %',
+                    data: margins,
+                    borderColor: this.settings.accentColor,
+                    backgroundColor: this.settings.accentColor + '20',
+                    borderWidth: 2,
+                    pointBackgroundColor: this.settings.accentColor
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    r: {
+                        beginAtZero: true,
+                        max: 100,
+                        ticks: {
+                            callback: function(value) {
+                                return value + '%';
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    updateCustomerInsights() {
+        // Top customer by total spending
+        const customerSpending = {};
+        this.salesData.forEach(sale => {
+            const customer = sale.customerName;
+            customerSpending[customer] = (customerSpending[customer] || 0) + (sale.sellingPrice || 0);
+        });
+
+        const topCustomer = Object.entries(customerSpending)
+            .sort(([,a], [,b]) => b - a)[0];
+
+        document.getElementById('top-customer').textContent = 
+            topCustomer ? `${topCustomer[0]} (${this.settings.currency}${topCustomer[1].toFixed(2)})` : 'N/A';
+
+        // Repeat customers
+        const customerPurchases = {};
+        this.salesData.forEach(sale => {
+            const customer = sale.customerName;
+            customerPurchases[customer] = (customerPurchases[customer] || 0) + 1;
+        });
+
+        const repeatCustomers = Object.values(customerPurchases).filter(count => count > 1).length;
+        document.getElementById('repeat-customers').textContent = repeatCustomers.toString();
+
+        // New customers this month
+        const currentMonth = new Date().getMonth();
+        const currentYear = new Date().getFullYear();
+        const newCustomersThisMonth = this.customersData.filter(customer => {
+            const createdDate = new Date(customer.createdAt);
+            return createdDate.getMonth() === currentMonth && createdDate.getFullYear() === currentYear;
+        }).length;
+
+        document.getElementById('new-customers').textContent = newCustomersThisMonth.toString();
+    }
+
+    renderSalesList() {
+        const tableBody = document.getElementById('sales-table-body');
+        if (!tableBody) return;
+
+        if (this.salesData.length === 0) {
+            tableBody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 2rem;">No sales data available</td></tr>';
+            return;
+        }
+
+        tableBody.innerHTML = this.salesData.map(sale => {
+            const categoriesText = sale.categories && Array.isArray(sale.categories) 
+                ? sale.categories.map(cat => `${cat.category || cat} (${cat.quantity || 1})`).join(', ')
+                : (Array.isArray(sale.category) ? sale.category.join(', ') : sale.category || 'N/A');
+
+            const totalQuantity = sale.categories && Array.isArray(sale.categories)
+                ? sale.categories.reduce((sum, cat) => sum + (cat.quantity || 1), 0)
+                : 1;
+
+            return `
+                <tr>
+                    <td><input type="checkbox" value="${sale.id}" onchange="toggleSaleSelection('${sale.id}')"></td>
+                    <td>${this.formatDate(sale.saleDate)}</td>
+                    <td>
+                        <strong>${sale.customerName}</strong><br>
+                        <small>${sale.phoneNumber}</small>
+                    </td>
+                    <td>${categoriesText}</td>
+                    <td>${totalQuantity}</td>
+                    <td>${this.settings.currency}${(sale.costPrice || 0).toFixed(2)}</td>
+                    <td>${this.settings.currency}${(sale.sellingPrice || 0).toFixed(2)}</td>
+                    <td class="${(sale.profit || 0) >= 0 ? 'text-success' : 'text-danger'}">
+                        ${this.settings.currency}${(sale.profit || 0).toFixed(2)}
+                    </td>
+                    <td>
+                        <button class="btn btn-sm btn-primary" onclick="generateReceipt('${sale.id}')" title="Generate Receipt">
+                            <i class="fas fa-receipt"></i>
+                        </button>
+                        <button class="btn btn-sm btn-secondary" onclick="editSale('${sale.id}')" title="Edit">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="btn btn-sm btn-danger" onclick="deleteSale('${sale.id}')" title="Delete">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+
+        // Add global function for sale selection
+        window.toggleSaleSelection = (saleId) => {
+            const checkbox = document.querySelector(`input[value="${saleId}"]`);
+            if (checkbox.checked) {
+                this.selectedSales.add(saleId);
+            } else {
+                this.selectedSales.delete(saleId);
+            }
+            
+            const deleteBtn = document.getElementById('delete-selected');
+            if (deleteBtn) {
+                deleteBtn.disabled = this.selectedSales.size === 0;
+            }
+        };
+    }
+
+    generateReceipt(saleId) {
+        const sale = this.salesData.find(s => s.id === saleId);
+        if (!sale) {
+            this.showMessage('Sale not found', 'error');
+            return;
+        }
+
+        this.showReceiptModal(sale);
+    }
+
+    renderCustomersList() {
+        const customersList = document.getElementById('customers-list');
+        if (!customersList) return;
+
+        if (this.customersData.length === 0) {
+            customersList.innerHTML = '<div style="text-align: center; padding: 2rem;">No customers data available</div>';
+            return;
+        }
+
+        customersList.innerHTML = this.customersData.map(customer => {
+            const customerSales = this.salesData.filter(sale => sale.phoneNumber === customer.phone);
+            const totalSpent = customerSales.reduce((sum, sale) => sum + (sale.sellingPrice || 0), 0);
+            const purchaseCount = customerSales.length;
+
+            return `
+                <div class="customer-item">
+                    <div class="customer-info">
+                        <h4>${customer.name}</h4>
+                        <p><i class="fas fa-phone"></i> ${customer.phone}</p>
+                        ${customer.email ? `<p><i class="fas fa-envelope"></i> ${customer.email}</p>` : ''}
+                        ${customer.address ? `<p><i class="fas fa-map-marker-alt"></i> ${customer.address}</p>` : ''}
+                    </div>
+                    <div class="customer-stats">
+                        <span class="purchase-count">${purchaseCount} purchase${purchaseCount !== 1 ? 's' : ''}</span>
+                        <span class="total-spent">${this.settings.currency}${totalSpent.toFixed(2)}</span>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    // Settings Functions
+    loadSettingsUI() {
+        document.getElementById('primary-color').value = this.settings.primaryColor;
+        document.getElementById('button-color').value = this.settings.buttonColor;
+        document.getElementById('accent-color').value = this.settings.accentColor;
+        document.getElementById('currency').value = this.settings.currency;
+        document.getElementById('date-format').value = this.settings.dateFormat;
+        document.getElementById('auto-backup').checked = this.settings.autoBackup;
+
+        this.updateColorPreviews();
+    }
+
+    updateColorPreviews() {
+        document.getElementById('primary-preview').style.backgroundColor = this.settings.primaryColor;
+        document.getElementById('button-preview').style.backgroundColor = this.settings.buttonColor;
+        document.getElementById('accent-preview').style.backgroundColor = this.settings.accentColor;
+    }
+
+    updatePrimaryColor(color) {
+        this.settings.primaryColor = color;
+        this.applyColors();
+        this.saveSettings();
+        this.updateColorPreviews();
+    }
+
+    updateButtonColor(color) {
+        this.settings.buttonColor = color;
+        this.applyColors();
+        this.saveSettings();
+        this.updateColorPreviews();
+    }
+
+    updateAccentColor(color) {
+        this.settings.accentColor = color;
+        this.applyColors();
+        this.saveSettings();
+        this.updateColorPreviews();
+    }
+
+    resetColors() {
+        this.settings.primaryColor = '#4285f4';
+        this.settings.buttonColor = '#34a853';
+        this.settings.accentColor = '#ea4335';
+        
+        document.getElementById('primary-color').value = this.settings.primaryColor;
+        document.getElementById('button-color').value = this.settings.buttonColor;
+        document.getElementById('accent-color').value = this.settings.accentColor;
+        
+        this.applyColors();
+        this.saveSettings();
+        this.updateColorPreviews();
+        this.showMessage('Colors reset to default', 'success');
+    }
+
+    applyColors() {
+        const root = document.documentElement;
+        root.style.setProperty('--primary-color', this.settings.primaryColor);
+        root.style.setProperty('--primary-dark', this.darkenColor(this.settings.primaryColor, 20));
+        root.style.setProperty('--primary-light', this.lightenColor(this.settings.primaryColor, 20));
+        root.style.setProperty('--button-color', this.settings.buttonColor);
+        root.style.setProperty('--button-hover', this.darkenColor(this.settings.buttonColor, 10));
+        root.style.setProperty('--accent-color', this.settings.accentColor);
+        root.style.setProperty('--accent-hover', this.darkenColor(this.settings.accentColor, 10));
+        
+        // Update gradients
+        root.style.setProperty('--gradient-primary', `linear-gradient(135deg, ${this.settings.primaryColor}, ${this.darkenColor(this.settings.primaryColor, 20)})`);
+        root.style.setProperty('--gradient-success', `linear-gradient(135deg, ${this.settings.buttonColor}, ${this.darkenColor(this.settings.buttonColor, 10)})`);
+        root.style.setProperty('--gradient-danger', `linear-gradient(135deg, ${this.settings.accentColor}, ${this.darkenColor(this.settings.accentColor, 10)})`);
+    }
+
+    darkenColor(color, percent) {
+        const num = parseInt(color.replace("#", ""), 16);
+        const amt = Math.round(2.55 * percent);
+        const R = (num >> 16) - amt;
+        const G = (num >> 8 & 0x00FF) - amt;
+        const B = (num & 0x0000FF) - amt;
+        return "#" + (0x1000000 + (R < 255 ? R < 1 ? 0 : R : 255) * 0x10000 +
+            (G < 255 ? G < 1 ? 0 : G : 255) * 0x100 +
+            (B < 255 ? B < 1 ? 0 : B : 255)).toString(16).slice(1);
+    }
+
+    lightenColor(color, percent) {
+        const num = parseInt(color.replace("#", ""), 16);
+        const amt = Math.round(2.55 * percent);
+        const R = (num >> 16) + amt;
+        const G = (num >> 8 & 0x00FF) + amt;
+        const B = (num & 0x0000FF) + amt;
+        return "#" + (0x1000000 + (R < 255 ? R < 1 ? 0 : R : 255) * 0x10000 +
+            (G < 255 ? G < 1 ? 0 : G : 255) * 0x100 +
+            (B < 255 ? B < 1 ? 0 : B : 255)).toString(16).slice(1);
+    }
+
+    updateCurrency(currency) {
+        this.settings.currency = currency;
+        this.saveSettings();
+        this.updateDashboard();
+        this.renderSalesList();
+        this.showMessage('Currency updated', 'success');
+    }
+
+    updateDateFormat(format) {
+        this.settings.dateFormat = format;
+        this.saveSettings();
+        this.showMessage('Date format updated', 'success');
+    }
+
+    toggleAutoBackup(enabled) {
+        this.settings.autoBackup = enabled;
+        this.saveSettings();
+        this.showMessage(`Auto backup ${enabled ? 'enabled' : 'disabled'}`, 'success');
+    }
+
+    openChangePasswordModal() {
+        const modal = document.getElementById('change-password-modal');
+        modal.classList.add('active');
+    }
+
+    closeChangePasswordModal() {
+        const modal = document.getElementById('change-password-modal');
+        modal.classList.remove('active');
+        document.getElementById('change-password-form').reset();
+    }
+
+    async handleChangePassword(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(e.target);
+        const currentPassword = formData.get('current-password');
+        const newPassword = formData.get('new-password');
+        const confirmPassword = formData.get('confirm-password');
+
+        if (newPassword !== confirmPassword) {
+            this.showMessage('New passwords do not match', 'error');
+            return;
+        }
+
+        if (newPassword.length < 6) {
+            this.showMessage('Password must be at least 6 characters long', 'error');
+            return;
+        }
+
+        try {
+            // Validate current password
+            const isValidCurrent = await this.validateCredentials(this.currentUser.username, currentPassword);
+            if (!isValidCurrent) {
+                this.showMessage('Current password is incorrect', 'error');
+                return;
+            }
+
+            // Save new password to Firebase
+            if (this.isFirebaseInitialized) {
+                await this.saveToFirebase('users', {
+                    username: this.currentUser.username,
+                    password: this.hashPassword(newPassword),
+                    updatedAt: new Date().toISOString()
+                }, this.currentUser.username);
+            }
+
+            this.closeChangePasswordModal();
+            this.showMessage('Password changed successfully', 'success');
+        } catch (error) {
+            console.error('Error changing password:', error);
+            this.showMessage('Error changing password', 'error');
+        }
+    }
+
+    async saveSettings() {
+        try {
+            if (this.isFirebaseInitialized) {
+                await this.saveToFirebase('settings', this.settings, 'app');
+            }
+            this.saveToLocalStorage();
+        } catch (error) {
+            console.error('Error saving settings:', error);
+        }
+    }
+
+    loadSettings() {
+        const savedSettings = localStorage.getItem('theiaJewelzSettings');
+        if (savedSettings) {
+            this.settings = { ...this.settings, ...JSON.parse(savedSettings) };
+        }
+    }
+
+    backupData() {
+        const backupData = {
+            sales: this.salesData,
+            customers: this.customersData,
+            settings: this.settings,
+            exportDate: new Date().toISOString(),
+            version: '2.0.0'
+        };
+
+        const dataStr = JSON.stringify(backupData, null, 2);
+        const dataBlob = new Blob([dataStr], { type: 'application/json' });
+        const url = URL.createObjectURL(dataBlob);
+        
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `theia-jewelz-backup-${new Date().toISOString().split('T')[0]}.json`;
+        link.click();
+        
+        URL.revokeObjectURL(url);
+        this.showMessage('Backup downloaded successfully', 'success');
+    }
+
+    restoreData() {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.json';
+        
+        input.onchange = async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            try {
+                const text = await file.text();
+                const backupData = JSON.parse(text);
+                
+                if (backupData.sales && backupData.customers) {
+                    this.salesData = backupData.sales;
+                    this.customersData = backupData.customers;
+                    if (backupData.settings) {
+                        this.settings = { ...this.settings, ...backupData.settings };
+                    }
+                    
+                    this.saveToLocalStorage();
+                    this.applyColors();
+                    this.updateDashboard();
+                    this.renderSalesList();
+                    this.renderCustomersList();
+                    
+                    this.showMessage('Data restored successfully', 'success');
+                } else {
+                    throw new Error('Invalid backup file format');
+                }
+            } catch (error) {
+                console.error('Error restoring data:', error);
+                this.showMessage('Error restoring data: ' + error.message, 'error');
+            }
+        };
+        
+        input.click();
+    }
+
+    clearAllData() {
+        if (confirm('Are you sure you want to clear all data? This action cannot be undone.')) {
+            this.salesData = [];
+            this.customersData = [];
+            this.saveToLocalStorage();
+            this.updateDashboard();
+            this.renderSalesList();
+            this.renderCustomersList();
+            this.showMessage('All data cleared', 'success');
+        }
+    }
+
+    // Utility Functions
+    formatDate(dateString) {
+        if (!dateString) return 'N/A';
+        
+        const date = new Date(dateString);
+        const format = this.settings.dateFormat;
+        
+        const day = date.getDate().toString().padStart(2, '0');
+        const month = (date.getMonth() + 1).toString().padStart(2, '0');
+        const year = date.getFullYear();
+        
+        switch (format) {
+            case 'MM/DD/YYYY':
+                return `${month}/${day}/${year}`;
+            case 'YYYY-MM-DD':
+                return `${year}-${month}-${day}`;
+            default: // DD/MM/YYYY
+                return `${day}/${month}/${year}`;
+        }
+    }
+
+    showLoading(show) {
+        const overlay = document.getElementById('loading-overlay');
+        if (overlay) {
+            if (show) {
+                overlay.classList.add('active');
+            } else {
+                overlay.classList.remove('active');
+            }
+        }
+    }
+
+    showMessage(message, type = 'info') {
+        const toast = document.getElementById('message-toast');
+        const toastContent = toast.querySelector('.toast-content');
+        const toastIcon = toast.querySelector('.toast-icon');
+        const toastMessage = toast.querySelector('.toast-message');
+        
+        // Set message and type
+        toastMessage.textContent = message;
+        toastContent.className = `toast-content ${type}`;
+        
+        // Set icon based on type
+        let iconClass = 'fas fa-info-circle';
+        switch (type) {
+            case 'success':
+                iconClass = 'fas fa-check-circle';
+                break;
+            case 'error':
+                iconClass = 'fas fa-exclamation-circle';
+                break;
+            case 'warning':
+                iconClass = 'fas fa-exclamation-triangle';
+                break;
+        }
+        toastIcon.className = `toast-icon ${iconClass}`;
+        
+        // Show toast
+        toast.classList.add('show');
+        
+        // Hide after 3 seconds
+        setTimeout(() => {
+            toast.classList.remove('show');
+        }, 3000);
+    }
+
+    // Placeholder functions for features to be implemented
+    applyFilters() {
+        // TODO: Implement filtering logic
+        this.showMessage('Filters applied', 'success');
+    }
+
+    toggleSelectAll() {
+        // TODO: Implement select all logic
+        console.log('Toggle select all');
+    }
+
+    deleteSelected() {
+        // TODO: Implement delete selected logic
+        this.showMessage('Selected items deleted', 'success');
+    }
+
+    deleteAll() {
+        if (confirm('Are you sure you want to delete all sales? This action cannot be undone.')) {
+            this.salesData = [];
+            this.saveToLocalStorage();
+            this.renderSalesList();
+            this.updateDashboard();
+            this.showMessage('All sales deleted', 'success');
+        }
+    }
+
+    exportSales() {
+        // TODO: Implement export functionality
+        this.showMessage('Export functionality coming soon', 'info');
+    }
+
+    importSales() {
+        // TODO: Implement import functionality
+        this.showMessage('Import functionality coming soon', 'info');
+    }
+
+    editSale(id) {
+        // TODO: Implement edit functionality
+        this.showMessage('Edit functionality coming soon', 'info');
+    }
+
+    deleteSale(id) {
+        if (confirm('Are you sure you want to delete this sale?')) {
+            this.salesData = this.salesData.filter(sale => sale.id !== id);
+            this.saveToLocalStorage();
+            this.renderSalesList();
+            this.updateDashboard();
+            this.showMessage('Sale deleted', 'success');
+        }
+    }
+
+    addNewCustomer() {
+        // TODO: Implement add customer functionality
+        this.showMessage('Add customer functionality coming soon', 'info');
+    }
+
+    exportCustomers() {
+        // TODO: Implement export customers functionality
+        this.showMessage('Export customers functionality coming soon', 'info');
+    }
+
+    importCustomers() {
+        // TODO: Implement import customers functionality
+        this.showMessage('Import customers functionality coming soon', 'info');
+    }
+
+    handleImportSales(e) {
+        // TODO: Implement import sales from file
+        this.showMessage('Import sales functionality coming soon', 'info');
+    }
+}

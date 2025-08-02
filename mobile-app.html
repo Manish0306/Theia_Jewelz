@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Theia Jewelz - Mobile App</title>
+    <link rel="stylesheet" href="mobile-styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <!-- Mobile App Container -->
+    <div class="mobile-app">
+        <!-- Screen 1: Recent Sales -->
+        <div class="screen active" id="recent-sales-screen">
+            <!-- Status Bar -->
+            <div class="status-bar">
+                <span class="time">8:41</span>
+                <div class="status-icons">
+                    <i class="fas fa-signal"></i>
+                    <i class="fas fa-wifi"></i>
+                    <i class="fas fa-battery-three-quarters"></i>
+                </div>
+            </div>
+
+            <!-- Header -->
+            <header class="app-header">
+                <h1>Theia Jewelz</h1>
+            </header>
+
+            <!-- Main Content -->
+            <main class="main-content">
+                <!-- Recent Sales Card -->
+                <div class="metric-card">
+                    <div class="metric-icon">
+                        <i class="fas fa-rupee-sign"></i>
+                    </div>
+                    <div class="metric-content">
+                        <h2>RECENT SALES</h2>
+                        <div class="metric-value">₹90000</div>
+                    </div>
+                </div>
+
+                <!-- Sales Details -->
+                <div class="sales-details">
+                    <div class="detail-item">
+                        <span class="label">Customer</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="label">Earrings</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="label">Product</span>
+                    </div>
+                    <div class="detail-item highlight">
+                        <span class="label">Gold Necklace</span>
+                    </div>
+                </div>
+
+                <!-- Add Sale Button -->
+                <button class="primary-button" onclick="showScreen('dashboard-screen')">
+                    Add Sale
+                </button>
+            </main>
+
+            <!-- Bottom Navigation -->
+            <nav class="bottom-nav">
+                <button class="nav-item active" onclick="showScreen('recent-sales-screen')">
+                    <i class="fas fa-chart-line"></i>
+                    <span>Dashboard</span>
+                </button>
+                <button class="nav-item" onclick="showScreen('new-sale-screen')">
+                    <i class="fas fa-plus"></i>
+                    <span>New Sale</span>
+                </button>
+                <button class="nav-item" onclick="showScreen('customers-screen')">
+                    <i class="fas fa-users"></i>
+                    <span>Customers</span>
+                </button>
+            </nav>
+        </div>
+
+        <!-- Screen 2: Dashboard -->
+        <div class="screen" id="dashboard-screen">
+            <!-- Status Bar -->
+            <div class="status-bar">
+                <span class="time">9:41</span>
+                <div class="status-icons">
+                    <i class="fas fa-signal"></i>
+                    <i class="fas fa-wifi"></i>
+                    <i class="fas fa-battery-three-quarters"></i>
+                </div>
+            </div>
+
+            <!-- Header with Back Button -->
+            <header class="app-header">
+                <button class="back-button" onclick="showScreen('recent-sales-screen')">
+                    <i class="fas fa-arrow-left"></i>
+                </button>
+                <h1>Theia Jewelz</h1>
+            </header>
+
+            <!-- Dashboard Title -->
+            <div class="page-title">
+                <h2>Dashboard</h2>
+            </div>
+
+            <!-- Main Content -->
+            <main class="main-content">
+                <!-- Chart Container -->
+                <div class="chart-container">
+                    <canvas id="salesChart" width="300" height="150"></canvas>
+                </div>
+
+                <!-- Metrics Grid -->
+                <div class="metrics-grid">
+                    <div class="metric-row">
+                        <span class="metric-label">TOTAL SALES</span>
+                        <span class="metric-value">₹56,500</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">PROFIT</span>
+                        <span class="metric-value">1,72,000</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">BEST-SELLING</span>
+                        <span class="metric-value">Gold Nec</span>
+                    </div>
+                </div>
+
+                <!-- Action Button -->
+                <button class="primary-button">
+                    View Details
+                </button>
+            </main>
+
+            <!-- Bottom Navigation -->
+            <nav class="bottom-nav">
+                <button class="nav-item" onclick="showScreen('customers-screen')">
+                    <i class="fas fa-users"></i>
+                    <span>Customers</span>
+                </button>
+                <button class="nav-item active">
+                    <i class="fas fa-plus"></i>
+                    <span>New Sale</span>
+                </button>
+                <button class="nav-item">
+                    <i class="fas fa-users"></i>
+                    <span>Customers</span>
+                </button>
+            </nav>
+        </div>
+
+        <!-- Screen 3: Customers -->
+        <div class="screen" id="customers-screen">
+            <!-- Status Bar -->
+            <div class="status-bar">
+                <span class="time">9:41</span>
+                <div class="status-icons">
+                    <i class="fas fa-signal"></i>
+                    <i class="fas fa-wifi"></i>
+                    <i class="fas fa-battery-three-quarters"></i>
+                </div>
+            </div>
+
+            <!-- Header with Back Button -->
+            <header class="app-header">
+                <button class="back-button" onclick="showScreen('dashboard-screen')">
+                    <i class="fas fa-arrow-left"></i>
+                </button>
+                <h1>Theia Jewelz</h1>
+            </header>
+
+            <!-- Search Bar -->
+            <div class="search-container">
+                <div class="search-bar">
+                    <i class="fas fa-search"></i>
+                    <input type="text" placeholder="Search Customers">
+                </div>
+            </div>
+
+            <!-- Page Title -->
+            <div class="page-title">
+                <h2>Customers</h2>
+            </div>
+
+            <!-- Main Content -->
+            <main class="main-content">
+                <!-- Customer List -->
+                <div class="customer-list">
+                    <div class="customer-item">
+                        <span class="customer-name">Sarah W.</span>
+                        <span class="customer-value">3 P.C00</span>
+                    </div>
+                    <div class="customer-item">
+                        <span class="customer-name">David W.</span>
+                        <span class="customer-value">0 PuC0</span>
+                    </div>
+                    <div class="customer-item">
+                        <span class="customer-name">Emily R.</span>
+                        <span class="customer-value">05.000</span>
+                    </div>
+                    <div class="customer-item">
+                        <span class="customer-name">Bracelets</span>
+                        <span class="customer-value">55.000</span>
+                    </div>
+                </div>
+            </main>
+
+            <!-- Bottom Navigation -->
+            <nav class="bottom-nav">
+                <button class="nav-item" onclick="showScreen('recent-sales-screen')">
+                    <i class="fas fa-chart-bar"></i>
+                    <span>Sales Rep</span>
+                </button>
+                <button class="nav-item">
+                    <i class="fas fa-file-alt"></i>
+                    <span>Sales Report</span>
+                </button>
+                <button class="nav-item active">
+                    <i class="fas fa-users"></i>
+                    <span>Sales Report</span>
+                </button>
+            </nav>
+        </div>
+
+        <!-- Screen 4: Sales Forecast -->
+        <div class="screen" id="forecast-screen">
+            <!-- Status Bar -->
+            <div class="status-bar">
+                <span class="time">9:41</span>
+                <div class="status-icons">
+                    <i class="fas fa-signal"></i>
+                    <i class="fas fa-wifi"></i>
+                    <i class="fas fa-battery-three-quarters"></i>
+                </div>
+            </div>
+
+            <!-- Header with Back Button -->
+            <header class="app-header">
+                <button class="back-button" onclick="showScreen('customers-screen')">
+                    <i class="fas fa-arrow-left"></i>
+                </button>
+                <h1>Theia Jewelz</h1>
+            </header>
+
+            <!-- Main Content -->
+            <main class="main-content">
+                <!-- Forecast Card -->
+                <div class="metric-card">
+                    <div class="metric-icon forecast-icon">
+                        <i class="fas fa-chart-pie"></i>
+                    </div>
+                    <div class="metric-content">
+                        <h2>SALES FORECAST</h2>
+                        <div class="metric-value">₹60,000</div>
+                        <div class="metric-subtitle">petsu.month</div>
+                    </div>
+                </div>
+
+                <!-- Pie Chart Container -->
+                <div class="chart-container pie-chart">
+                    <canvas id="pieChart" width="200" height="200"></canvas>
+                </div>
+
+                <!-- Legend -->
+                <div class="chart-legend">
+                    <div class="legend-item">
+                        <span class="legend-color purple"></span>
+                        <span class="legend-label">Earrings</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-color teal"></span>
+                        <span class="legend-label">Necklaces</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-color blue"></span>
+                        <span class="legend-label">Rings</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-color purple-light"></span>
+                        <span class="legend-label">Bracelets</span>
+                    </div>
+                </div>
+            </main>
+
+            <!-- Bottom Navigation -->
+            <nav class="bottom-nav">
+                <button class="nav-item">
+                    <i class="fas fa-chart-bar"></i>
+                    <span>Sales Rep</span>
+                </button>
+                <button class="nav-item">
+                    <i class="fas fa-file-alt"></i>
+                    <span>Sales Report</span>
+                </button>
+                <button class="nav-item active">
+                    <i class="fas fa-users"></i>
+                    <span>Sales Report</span>
+                </button>
+            </nav>
+        </div>
+    </div>
+
+    <script src="mobile-app.js"></script>
+</body>
+</html>

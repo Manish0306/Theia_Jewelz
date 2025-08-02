@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Offline - Theia Jewelz</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #D4AF37, #B8941F);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            text-align: center;
+        }
+        
+        .offline-container {
+            max-width: 500px;
+            padding: 2rem;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+        
+        .offline-icon {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+            opacity: 0.8;
+        }
+        
+        h1 {
+            font-size: 2rem;
+            margin-bottom: 1rem;
+        }
+        
+        p {
+            font-size: 1.1rem;
+            line-height: 1.6;
+            margin-bottom: 2rem;
+            opacity: 0.9;
+        }
+        
+        .retry-btn {
+            background: white;
+            color: #D4AF37;
+            border: none;
+            padding: 0.75rem 2rem;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+        
+        .retry-btn:hover {
+            transform: translateY(-2px);
+        }
+        
+        .features-list {
+            text-align: left;
+            margin: 2rem 0;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 1.5rem;
+            border-radius: 8px;
+        }
+        
+        .features-list h3 {
+            margin-top: 0;
+            margin-bottom: 1rem;
+        }
+        
+        .features-list ul {
+            margin: 0;
+            padding-left: 1.5rem;
+        }
+        
+        .features-list li {
+            margin-bottom: 0.5rem;
+        }
+        
+        @media (max-width: 768px) {
+            .offline-container {
+                margin: 1rem;
+                padding: 1.5rem;
+            }
+            
+            h1 {
+                font-size: 1.5rem;
+            }
+            
+            .offline-icon {
+                font-size: 3rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="offline-container">
+        <div class="offline-icon">📡</div>
+        <h1>You're Currently Offline</h1>
+        <p>
+            Don't worry! Theia Jewelz works offline too. Your data is safely stored locally 
+            and will sync automatically when you're back online.
+        </p>
+        
+        <div class="features-list">
+            <h3>What you can still do:</h3>
+            <ul>
+                <li>Add new sales records</li>
+                <li>Manage customer information</li>
+                <li>View existing data</li>
+                <li>Generate receipts and reports</li>
+                <li>Export data to Excel/PDF</li>
+            </ul>
+        </div>
+        
+        <button class="retry-btn" onclick="window.location.reload()">
+            Try Connecting Again
+        </button>
+        
+        <script>
+            // Auto-retry when online
+            window.addEventListener('online', () => {
+                window.location.reload();
+            });
+            
+            // Show online status
+            function updateStatus() {
+                if (navigator.onLine) {
+                    window.location.reload();
+                }
+            }
+            
+            // Check connection periodically
+            setInterval(updateStatus, 5000);
+        </script>
+    </div>
+</body>
+</html>

@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Theia Jewelz - Jewelry Sales Management</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <!-- Login Page -->
+    <div id="login-page" class="page active">
+        <div class="login-container">
+            <div class="login-card">
+                <div class="login-header">
+                    <i class="fas fa-gem login-icon"></i>
+                    <h1>Theia Jewelz</h1>
+                    <p>Jewelry Sales Management System</p>
+                </div>
+                <form id="login-form" class="login-form">
+                    <div class="form-group">
+                        <label for="username">Username</label>
+                        <div class="input-container">
+                            <i class="fas fa-user input-icon"></i>
+                            <input type="text" id="username" name="username" required placeholder="Enter username">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="password">Password</label>
+                        <div class="input-container">
+                            <i class="fas fa-lock input-icon"></i>
+                            <input type="password" id="password" name="password" required placeholder="Enter password">
+                            <i class="fas fa-eye toggle-password" onclick="togglePassword()"></i>
+                        </div>
+                    </div>
+                    <button type="submit" class="login-btn">
+                        <i class="fas fa-sign-in-alt"></i>
+                        Login
+                    </button>
+                </form>
+                <div class="login-footer">
+                    <p>© 2024 Theia Jewelz. All rights reserved.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Homepage -->
+    <div id="homepage" class="page">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <div class="logo-section">
+                    <i class="fas fa-gem logo-icon"></i>
+                    <h1 class="app-title">Theia Jewelz</h1>
+                </div>
+                <div class="user-info">
+                    <span id="welcome-user">Welcome, Admin</span>
+                    <button class="logout-btn" onclick="logout()">
+                        <i class="fas fa-sign-out-alt"></i>
+                        Logout
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content Grid -->
+        <main class="main-content">
+            <div class="navigation-grid">
+                <!-- Add Sale -->
+                <div class="nav-card add-sale-card" onclick="navigateTo('add-sale')">
+                    <div class="nav-icon">
+                        <i class="fas fa-plus"></i>
+                    </div>
+                    <h3 class="nav-title">Add Sale</h3>
+                    <p class="nav-description">Record new jewelry sales</p>
+                </div>
+
+                <!-- Recent Sales -->
+                <div class="nav-card recent-sales-card" onclick="navigateTo('recent-sales')">
+                    <div class="nav-icon">
+                        <i class="fas fa-list"></i>
+                    </div>
+                    <h3 class="nav-title">Recent Sales</h3>
+                    <p class="nav-description">View and manage sales</p>
+                </div>
+
+                <!-- Dashboard -->
+                <div class="nav-card dashboard-card" onclick="navigateTo('dashboard')">
+                    <div class="nav-icon">
+                        <i class="fas fa-chart-bar"></i>
+                    </div>
+                    <h3 class="nav-title">Dashboard</h3>
+                    <p class="nav-description">Sales overview & KPIs</p>
+                </div>
+
+                <!-- Customers -->
+                <div class="nav-card customers-card" onclick="navigateTo('customers')">
+                    <div class="nav-icon">
+                        <i class="fas fa-users"></i>
+                    </div>
+                    <h3 class="nav-title">Customers</h3>
+                    <p class="nav-description">Manage customer database</p>
+                </div>
+
+                <!-- Analytics -->
+                <div class="nav-card analytics-card" onclick="navigateTo('analytics')">
+                    <div class="nav-icon">
+                        <i class="fas fa-chart-line"></i>
+                    </div>
+                    <h3 class="nav-title">Analytics</h3>
+                    <p class="nav-description">Advanced insights</p>
+                </div>
+
+                <!-- Settings -->
+                <div class="nav-card settings-card" onclick="navigateTo('settings')">
+                    <div class="nav-icon">
+                        <i class="fas fa-cog"></i>
+                    </div>
+                    <h3 class="nav-title">Settings</h3>
+                    <p class="nav-description">App configuration</p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Add Sale Page -->
+    <div id="add-sale" class="page">
+        <header class="page-header">
+            <button class="back-btn" onclick="navigateTo('homepage')">
+                <i class="fas fa-arrow-left"></i>
+            </button>
+            <h2 class="page-title">Add New Sale</h2>
+        </header>
+
+        <main class="page-content">
+            <form id="add-sale-form" class="sale-form">
+                <!-- Customer Information Section -->
+                <div class="form-section">
+                    <div class="section-header">
+                        <i class="fas fa-user section-icon"></i>
+                        <h3>Customer Information</h3>
+                    </div>
+                    
+                    <!-- Customer Search -->
+                    <div class="form-group">
+                        <label for="customer-search">Search Existing Customer</label>
+                        <div class="search-container">
+                            <input type="text" id="customer-search" placeholder="Search by name or phone...">
+                            <div id="customer-suggestions" class="suggestions-dropdown"></div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="customer-name">Customer Name <span class="mandatory">*</span></label>
+                        <input type="text" id="customer-name" name="customerName" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="phone-number">Phone Number <span class="mandatory">*</span></label>
+                        <input type="tel" id="phone-number" name="phoneNumber" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="email">Email</label>
+                        <input type="email" id="email" name="email">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="address">Address</label>
+                        <textarea id="address" name="address" rows="3"></textarea>
+                    </div>
+                </div>
+
+                <!-- Product Information Section -->
+                <div class="form-section">
+                    <div class="section-header">
+                        <i class="fas fa-gem section-icon"></i>
+                        <h3>Product Information</h3>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Categories & Quantities <span class="mandatory">*</span></label>
+                        <div class="category-checkbox-container">
+                            <div class="category-item">
+                                <input type="checkbox" id="cat-necklaces" name="categories" value="Necklaces">
+                                <label for="cat-necklaces">Necklaces</label>
+                                <input type="number" id="qty-necklaces" name="quantities" min="1" placeholder="Qty" disabled>
+                            </div>
+                            <div class="category-item">
+                                <input type="checkbox" id="cat-rings" name="categories" value="Rings">
+                                <label for="cat-rings">Rings</label>
+                                <input type="number" id="qty-rings" name="quantities" min="1" placeholder="Qty" disabled>
+                            </div>
+                            <div class="category-item">
+                                <input type="checkbox" id="cat-earrings" name="categories" value="Earrings">
+                                <label for="cat-earrings">Earrings</label>
+                                <input type="number" id="qty-earrings" name="quantities" min="1" placeholder="Qty" disabled>
+                            </div>
+                            <div class="category-item">
+                                <input type="checkbox" id="cat-bracelets" name="categories" value="Bracelets">
+                                <label for="cat-bracelets">Bracelets</label>
+                                <input type="number" id="qty-bracelets" name="quantities" min="1" placeholder="Qty" disabled>
+                            </div>
+                            <div class="category-item">
+                                <input type="checkbox" id="cat-chains" name="categories" value="Chains">
+                                <label for="cat-chains">Chains</label>
+                                <input type="number" id="qty-chains" name="quantities" min="1" placeholder="Qty" disabled>
+                            </div>
+                            <div class="category-item">
+                                <input type="checkbox" id="cat-sets" name="categories" value="Sets">
+                                <label for="cat-sets">Sets</label>
+                                <input type="number" id="qty-sets" name="quantities" min="1" placeholder="Qty" disabled>
+                            </div>
+                            <div class="category-item">
+                                <input type="checkbox" id="cat-pendants" name="categories" value="Pendants">
+                                <label for="cat-pendants">Pendants</label>
+                                <input type="number" id="qty-pendants" name="quantities" min="1" placeholder="Qty" disabled>
+                            </div>
+                            <div class="category-item">
+                                <input type="checkbox" id="cat-bangles" name="categories" value="Bangles">
+                                <label for="cat-bangles">Bangles</label>
+                                <input type="number" id="qty-bangles" name="quantities" min="1" placeholder="Qty" disabled>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="sale-date">Sale Date <span class="mandatory">*</span></label>
+                        <input type="date" id="sale-date" name="saleDate" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="cost-price">Cost Price (₹) <span class="mandatory">*</span></label>
+                        <input type="number" id="cost-price" name="costPrice" step="0.01" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="selling-price">Selling Price (₹) <span class="mandatory">*</span></label>
+                        <input type="number" id="selling-price" name="sellingPrice" step="0.01" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="shipping-cost">Shipping Cost (₹)</label>
+                        <input type="number" id="shipping-cost" name="shippingCost" step="0.01" value="0">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="profit">Profit (₹)</label>
+                        <input type="number" id="profit" name="profit" step="0.01" readonly>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="payment-mode">Payment Mode</label>
+                        <select id="payment-mode" name="paymentMode">
+                            <option value="Cash">Cash</option>
+                            <option value="UPI">UPI</option>
+                            <option value="Card">Card</option>
+                            <option value="Bank Transfer">Bank Transfer</option>
+                            <option value="Cheque">Cheque</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="submit-btn">
+                        <i class="fas fa-save"></i>
+                        Add Sales Record
+                    </button>
+                    <button type="button" class="preview-receipt-btn" onclick="previewReceipt()">
+                        <i class="fas fa-eye"></i>
+                        Preview Receipt
+                    </button>
+                </div>
+            </form>
+        </main>
+    </div>
+
+    <!-- Recent Sales Page -->
+    <div id="recent-sales" class="page">
+        <header class="page-header">
+            <button class="back-btn" onclick="navigateTo('homepage')">
+                <i class="fas fa-arrow-left"></i>
+            </button>
+            <h2 class="page-title">Recent Sales</h2>
+        </header>
+
+        <main class="page-content">
+            <!-- Filters Section -->
+            <div class="filters-section">
+                <div class="filter-row">
+                    <div class="filter-group">
+                        <label>From Date</label>
+                        <input type="date" id="from-date" class="filter-input">
+                    </div>
+                    <div class="filter-group">
+                        <label>To Date</label>
+                        <input type="date" id="to-date" class="filter-input">
+                    </div>
+                    <div class="filter-group">
+                        <label>Category</label>
+                        <select id="filter-category" class="filter-input">
+                            <option value="">All Categories</option>
+                            <option value="Necklaces">Necklaces</option>
+                            <option value="Rings">Rings</option>
+                            <option value="Earrings">Earrings</option>
+                            <option value="Bracelets">Bracelets</option>
+                            <option value="Chains">Chains</option>
+                            <option value="Sets">Sets</option>
+                            <option value="Pendants">Pendants</option>
+                            <option value="Bangles">Bangles</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="filter-actions">
+                    <button class="apply-filters-btn" onclick="applyFilters()">
+                        <i class="fas fa-filter"></i>
+                        Apply Filters
+                    </button>
+                    <button class="btn btn-secondary" onclick="exportSales()">
+                        <i class="fas fa-download"></i> Export Excel
+                    </button>
+                    <button class="btn btn-secondary" onclick="importSales()">
+                        <i class="fas fa-upload"></i> Import Excel
+                    </button>
+                    <button class="btn btn-danger" onclick="deleteSelected()" id="delete-selected" disabled>
+                        <i class="fas fa-trash"></i> Delete Selected
+                    </button>
+                    <button class="btn btn-danger" onclick="deleteAll()">
+                        <i class="fas fa-trash-alt"></i> Delete All
+                    </button>
+                </div>
+                <input type="file" id="import-file" accept=".xlsx,.xls,.csv" style="display: none;">
+            </div>
+
+            <!-- Sales List -->
+            <div class="sales-list" id="sales-list">
+                <div class="list-header">
+                    <h3>Recent Sales</h3>
+                    <div class="list-actions">
+                        <input type="checkbox" id="select-all" onchange="toggleSelectAll()">
+                        <label for="select-all">Select All</label>
+                    </div>
+                </div>
+                
+                <div class="table-container">
+                    <table class="data-table" id="sales-table">
+                        <thead>
+                            <tr>
+                                <th><input type="checkbox" id="header-checkbox" onchange="toggleSelectAll()"></th>
+                                <th>Date</th>
+                                <th>Customer</th>
+                                <th>Category</th>
+                                <th>Quantity</th>
+                                <th>Cost Price</th>
+                                <th>Selling Price</th>
+                                <th>Profit</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="sales-table-body">
+                            <!-- Sales data will be populated here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Dashboard Page -->
+    <div id="dashboard" class="page">
+        <header class="page-header">
+            <button class="back-btn" onclick="navigateTo('homepage')">
+                <i class="fas fa-arrow-left"></i>
+            </button>
+            <h2 class="page-title">Dashboard</h2>
+        </header>
+
+        <main class="page-content">
+            <!-- KPI Cards -->
+            <div class="kpi-grid">
+                <div class="kpi-card total-sales-kpi">
+                    <div class="kpi-icon">
+                        <i class="fas fa-dollar-sign"></i>
+                    </div>
+                    <div class="kpi-content">
+                        <h3 id="total-sales">₹0.00</h3>
+                        <p>Total Sales</p>
+                    </div>
+                </div>
+
+                <div class="kpi-card total-profit-kpi">
+                    <div class="kpi-icon">
+                        <i class="fas fa-chart-line"></i>
+                    </div>
+                    <div class="kpi-content">
+                        <h3 id="total-profit">₹0.00</h3>
+                        <p>Total Profit</p>
+                    </div>
+                </div>
+
+                <div class="kpi-card total-orders-kpi">
+                    <div class="kpi-icon">
+                        <i class="fas fa-shopping-cart"></i>
+                    </div>
+                    <div class="kpi-content">
+                        <h3 id="total-orders">0</h3>
+                        <p>Total Orders</p>
+                    </div>
+                </div>
+
+                <div class="kpi-card avg-order-kpi">
+                    <div class="kpi-icon">
+                        <i class="fas fa-calculator"></i>
+                    </div>
+                    <div class="kpi-content">
+                        <h3 id="avg-order-value">₹0.00</h3>
+                        <p>Avg Order Value</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts Section -->
+            <div class="charts-section">
+                <div class="chart-card">
+                    <h3>Monthly Sales Trend</h3>
+                    <div class="chart-container">
+                        <canvas id="monthly-sales-chart"></canvas>
+                    </div>
+                </div>
+
+                <div class="chart-card">
+                    <h3>Category Distribution</h3>
+                    <div class="chart-container">
+                        <canvas id="category-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Customers Page -->
+    <div id="customers" class="page">
+        <header class="page-header">
+            <button class="back-btn" onclick="navigateTo('homepage')">
+                <i class="fas fa-arrow-left"></i>
+            </button>
+            <h2 class="page-title">Customers</h2>
+        </header>
+
+        <main class="page-content">
+            <div class="customers-actions">
+                <button class="btn btn-primary" onclick="addNewCustomer()">
+                    <i class="fas fa-plus"></i> Add Customer
+                </button>
+                <button class="btn btn-secondary" onclick="exportCustomers()">
+                    <i class="fas fa-download"></i> Export
+                </button>
+                <button class="btn btn-secondary" onclick="importCustomers()">
+                    <i class="fas fa-upload"></i> Import
+                </button>
+            </div>
+
+            <div class="customers-list" id="customers-list">
+                <!-- Customer data will be populated here -->
+            </div>
+        </main>
+    </div>
+
+    <!-- Analytics Page -->
+    <div id="analytics" class="page">
+        <header class="page-header">
+            <button class="back-btn" onclick="navigateTo('homepage')">
+                <i class="fas fa-arrow-left"></i>
+            </button>
+            <h2 class="page-title">Analytics</h2>
+        </header>
+
+        <main class="page-content">
+            <div class="analytics-content">
+                <div class="analytics-card">
+                    <h3>Top Selling Categories</h3>
+                    <div class="chart-container">
+                        <canvas id="top-categories-chart"></canvas>
+                    </div>
+                </div>
+
+                <div class="analytics-card">
+                    <h3>Sales Performance</h3>
+                    <div class="chart-container">
+                        <canvas id="performance-chart"></canvas>
+                    </div>
+                </div>
+
+                <div class="analytics-card">
+                    <h3>Customer Insights</h3>
+                    <div class="insights-content">
+                        <div class="insight-item">
+                            <span class="insight-label">Top Customer:</span>
+                            <span class="insight-value" id="top-customer">-</span>
+                        </div>
+                        <div class="insight-item">
+                            <span class="insight-label">Repeat Customers:</span>
+                            <span class="insight-value" id="repeat-customers">0</span>
+                        </div>
+                        <div class="insight-item">
+                            <span class="insight-label">New Customers (This Month):</span>
+                            <span class="insight-value" id="new-customers">0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="analytics-card">
+                    <h3>Profit Margins</h3>
+                    <div class="chart-container">
+                        <canvas id="profit-margin-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Settings Page -->
+    <div id="settings" class="page">
+        <header class="page-header">
+            <button class="back-btn" onclick="navigateTo('homepage')">
+                <i class="fas fa-arrow-left"></i>
+            </button>
+            <h2 class="page-title">Settings</h2>
+        </header>
+
+        <main class="page-content">
+            <div class="settings-content">
+                <!-- Security Settings -->
+                <div class="settings-section">
+                    <div class="section-header">
+                        <i class="fas fa-shield-alt section-icon"></i>
+                        <h3>Security Settings</h3>
+                    </div>
+                    
+                    <div class="setting-item">
+                        <label>Change Password</label>
+                        <button class="settings-btn" onclick="openChangePasswordModal()">
+                            <i class="fas fa-key"></i>
+                            Change Password
+                        </button>
+                    </div>
+                </div>
+
+                <!-- UI Customization -->
+                <div class="settings-section">
+                    <div class="section-header">
+                        <i class="fas fa-palette section-icon"></i>
+                        <h3>UI Customization</h3>
+                    </div>
+                    
+                    <div class="setting-item">
+                        <label for="primary-color">Primary Color</label>
+                        <div class="color-picker-container">
+                            <input type="color" id="primary-color" value="#4285f4" onchange="updatePrimaryColor(this.value)">
+                            <span class="color-preview" id="primary-preview"></span>
+                        </div>
+                    </div>
+
+                    <div class="setting-item">
+                        <label for="button-color">Button Color</label>
+                        <div class="color-picker-container">
+                            <input type="color" id="button-color" value="#34a853" onchange="updateButtonColor(this.value)">
+                            <span class="color-preview" id="button-preview"></span>
+                        </div>
+                    </div>
+
+                    <div class="setting-item">
+                        <label for="accent-color">Accent Color</label>
+                        <div class="color-picker-container">
+                            <input type="color" id="accent-color" value="#ea4335" onchange="updateAccentColor(this.value)">
+                            <span class="color-preview" id="accent-preview"></span>
+                        </div>
+                    </div>
+
+                    <div class="setting-item">
+                        <button class="settings-btn" onclick="resetColors()">
+                            <i class="fas fa-undo"></i>
+                            Reset to Default Colors
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Application Settings -->
+                <div class="settings-section">
+                    <div class="section-header">
+                        <i class="fas fa-cogs section-icon"></i>
+                        <h3>Application Settings</h3>
+                    </div>
+                    
+                    <div class="setting-item">
+                        <label for="currency">Currency</label>
+                        <select id="currency" onchange="updateCurrency(this.value)">
+                            <option value="₹">Indian Rupee (₹)</option>
+                            <option value="$">US Dollar ($)</option>
+                            <option value="€">Euro (€)</option>
+                            <option value="£">British Pound (£)</option>
+                        </select>
+                    </div>
+
+                    <div class="setting-item">
+                        <label for="date-format">Date Format</label>
+                        <select id="date-format" onchange="updateDateFormat(this.value)">
+                            <option value="DD/MM/YYYY">DD/MM/YYYY</option>
+                            <option value="MM/DD/YYYY">MM/DD/YYYY</option>
+                            <option value="YYYY-MM-DD">YYYY-MM-DD</option>
+                        </select>
+                    </div>
+
+                    <div class="setting-item">
+                        <label for="auto-backup">Auto Backup</label>
+                        <div class="toggle-switch">
+                            <input type="checkbox" id="auto-backup" onchange="toggleAutoBackup(this.checked)">
+                            <span class="slider"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Data Management -->
+                <div class="settings-section">
+                    <div class="section-header">
+                        <i class="fas fa-database section-icon"></i>
+                        <h3>Data Management</h3>
+                    </div>
+                    
+                    <div class="setting-item">
+                        <label>Backup Data</label>
+                        <button class="settings-btn" onclick="backupData()">
+                            <i class="fas fa-download"></i>
+                            Download Backup
+                        </button>
+                    </div>
+
+                    <div class="setting-item">
+                        <label>Restore Data</label>
+                        <button class="settings-btn" onclick="restoreData()">
+                            <i class="fas fa-upload"></i>
+                            Restore from Backup
+                        </button>
+                    </div>
+
+                    <div class="setting-item">
+                        <label>Clear All Data</label>
+                        <button class="settings-btn btn-danger" onclick="clearAllData()">
+                            <i class="fas fa-trash-alt"></i>
+                            Clear All Data
+                        </button>
+                    </div>
+                </div>
+
+                <!-- About -->
+                <div class="settings-section">
+                    <div class="section-header">
+                        <i class="fas fa-info-circle section-icon"></i>
+                        <h3>About</h3>
+                    </div>
+                    
+                    <div class="about-content">
+                        <p><strong>Theia Jewelz</strong></p>
+                        <p>Version 2.0.0</p>
+                        <p>Jewelry Sales Management System</p>
+                        <p>© 2024 Theia Jewelz. All rights reserved.</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Change Password Modal -->
+    <div id="change-password-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Change Password</h3>
+                <button class="close-btn" onclick="closeChangePasswordModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <form id="change-password-form" class="modal-form">
+                <div class="form-group">
+                    <label for="current-password">Current Password</label>
+                    <input type="password" id="current-password" required>
+                </div>
+                <div class="form-group">
+                    <label for="new-password">New Password</label>
+                    <input type="password" id="new-password" required minlength="6">
+                </div>
+                <div class="form-group">
+                    <label for="confirm-password">Confirm New Password</label>
+                    <input type="password" id="confirm-password" required minlength="6">
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeChangePasswordModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Change Password</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Receipt Preview Modal -->
+    <div id="receipt-modal" class="modal">
+        <div class="modal-content receipt-modal">
+            <div class="modal-header">
+                <h3>Receipt Preview</h3>
+                <button class="close-btn" onclick="closeReceiptModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="receipt-content" id="receipt-content">
+                <!-- Receipt content will be generated here -->
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" onclick="closeReceiptModal()">Close</button>
+                <button type="button" class="btn btn-primary" onclick="printReceipt()">
+                    <i class="fas fa-print"></i>
+                    Print Receipt
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="loading-overlay">
+        <div class="loading-spinner">
+            <i class="fas fa-spinner fa-spin"></i>
+            <p>Loading...</p>
+        </div>
+    </div>
+
+    <!-- Message Toast -->
+    <div id="message-toast" class="message-toast">
+        <div class="toast-content">
+            <i class="toast-icon"></i>
+            <span class="toast-message"></span>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="firebase-config.js"></script>
+    <script src="app.js"></script>
+    <script>
+        // Initialize the app when DOM is loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            window.theiaApp = new TheiaJewelzApp();
+        });
+    </script>
+</body>
+</html>
