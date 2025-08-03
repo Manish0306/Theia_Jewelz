@@ -10,6 +10,7 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
     <!-- Login Page -->
@@ -257,8 +258,8 @@
                     <div class="form-group">
                         <label for="payment-mode">Payment Mode</label>
                         <select id="payment-mode" name="paymentMode">
-                            <option value="Cash">Cash</option>
                             <option value="UPI">UPI</option>
+                            <option value="Cash">Cash</option>
                             <option value="Card">Card</option>
                             <option value="Bank Transfer">Bank Transfer</option>
                             <option value="Cheque">Cheque</option>
@@ -326,6 +327,9 @@
                     </button>
                     <button class="btn btn-secondary" onclick="importSales()">
                         <i class="fas fa-upload"></i> Import Excel
+                    </button>
+                    <button class="btn btn-info" onclick="app.generateSalesTemplate()">
+                        <i class="fas fa-file-download"></i> Download Template
                     </button>
                     <button class="btn btn-danger" onclick="deleteSelected()" id="delete-selected" disabled>
                         <i class="fas fa-trash"></i> Delete Selected
@@ -458,15 +462,51 @@
                     <i class="fas fa-plus"></i> Add Customer
                 </button>
                 <button class="btn btn-secondary" onclick="exportCustomers()">
-                    <i class="fas fa-download"></i> Export
+                    <i class="fas fa-download"></i> Export Excel
                 </button>
                 <button class="btn btn-secondary" onclick="importCustomers()">
-                    <i class="fas fa-upload"></i> Import
+                    <i class="fas fa-upload"></i> Import Excel
                 </button>
+                <button class="btn btn-info" onclick="app.generateCustomersTemplate()">
+                    <i class="fas fa-file-download"></i> Download Template
+                </button>
+                <button class="btn btn-danger" onclick="deleteSelectedCustomers()" id="delete-selected-customers" disabled>
+                    <i class="fas fa-trash"></i> Delete Selected
+                </button>
+                <button class="btn btn-danger" onclick="deleteAllCustomers()">
+                    <i class="fas fa-trash-alt"></i> Delete All
+                </button>
+                <input type="file" id="import-customers-file" accept=".xlsx,.xls,.csv" style="display: none;">
             </div>
 
             <div class="customers-list" id="customers-list">
-                <!-- Customer data will be populated here -->
+                <div class="list-header">
+                    <h3>Customer Database</h3>
+                    <div class="list-actions">
+                        <input type="checkbox" id="select-all-customers" onchange="toggleSelectAllCustomers()">
+                        <label for="select-all-customers">Select All</label>
+                    </div>
+                </div>
+                
+                <div class="table-container">
+                    <table class="data-table" id="customers-table">
+                        <thead>
+                            <tr>
+                                <th><input type="checkbox" id="customers-header-checkbox" onchange="toggleSelectAllCustomers()"></th>
+                                <th>Name</th>
+                                <th>Phone</th>
+                                <th>Email</th>
+                                <th>Address</th>
+                                <th>Total Purchases</th>
+                                <th>Total Spent</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="customers-table-body">
+                            <!-- Customer data will be populated here -->
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </main>
     </div>
@@ -727,6 +767,102 @@
         </div>
     </div>
 
+    <!-- Edit Sale Modal -->
+    <div id="edit-sale-modal" class="modal">
+        <div class="modal-content edit-sale-modal">
+            <div class="modal-header">
+                <h3>Edit Sale</h3>
+                <button class="close-btn" onclick="closeEditSaleModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <form id="edit-sale-form" class="edit-sale-form">
+                <input type="hidden" id="edit-sale-id" name="saleId">
+                
+                <!-- Customer Information -->
+                <div class="form-section">
+                    <h4>Customer Information</h4>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="edit-customer-name">Customer Name</label>
+                            <input type="text" id="edit-customer-name" name="customerName" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="edit-phone-number">Phone Number</label>
+                            <input type="tel" id="edit-phone-number" name="phoneNumber" required>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="edit-email">Email</label>
+                            <input type="email" id="edit-email" name="email">
+                        </div>
+                        <div class="form-group">
+                            <label for="edit-address">Address</label>
+                            <input type="text" id="edit-address" name="address">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Product Information -->
+                <div class="form-section">
+                    <h4>Product Information</h4>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="edit-sale-date">Sale Date</label>
+                            <input type="date" id="edit-sale-date" name="saleDate" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="edit-payment-mode">Payment Mode</label>
+                            <select id="edit-payment-mode" name="paymentMode">
+                                <option value="UPI">UPI</option>
+                                <option value="Cash">Cash</option>
+                                <option value="Card">Card</option>
+                                <option value="Bank Transfer">Bank Transfer</option>
+                                <option value="Cheque">Cheque</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="edit-cost-price">Cost Price (₹)</label>
+                            <input type="number" id="edit-cost-price" name="costPrice" step="0.01" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="edit-selling-price">Selling Price (₹)</label>
+                            <input type="number" id="edit-selling-price" name="sellingPrice" step="0.01" required>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="edit-shipping-cost">Shipping Cost (₹)</label>
+                            <input type="number" id="edit-shipping-cost" name="shippingCost" step="0.01" value="0">
+                        </div>
+                        <div class="form-group">
+                            <label for="edit-profit">Profit (₹)</label>
+                            <input type="number" id="edit-profit" name="profit" step="0.01" readonly>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Categories -->
+                <div class="form-section">
+                    <h4>Categories & Quantities</h4>
+                    <div class="edit-category-container" id="edit-categories-container">
+                        <!-- Categories will be populated here -->
+                    </div>
+                </div>
+            </form>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" onclick="closeEditSaleModal()">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveEditedSale()">
+                    <i class="fas fa-save"></i>
+                    Save Changes
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Loading Overlay -->
     <div id="loading-overlay" class="loading-overlay">
         <div class="loading-spinner">
@@ -745,6 +881,7 @@
 
     <!-- Scripts -->
     <script src="firebase-config.js"></script>
+    <script type="module" src="src/excel-handler.js"></script>
     <script src="app.js"></script>
     <script>
         // Initialize the app when DOM is loaded

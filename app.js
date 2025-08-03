@@ -18,6 +18,8 @@ class TheiaJewelzApp {
         };
         this.charts = {};
         this.categories = ['necklaces', 'rings', 'earrings', 'bracelets', 'chains', 'sets', 'pendants', 'bangles'];
+        this.excelHandler = null;
+        this.editingSaleId = null;
         this.init();
     }
 
@@ -26,6 +28,9 @@ class TheiaJewelzApp {
         
         // Initialize Firebase
         await this.initializeFirebase();
+        
+        // Initialize Excel Handler
+        await this.initializeExcelHandler();
         
         // Load settings
         this.loadSettings();
@@ -57,6 +62,27 @@ class TheiaJewelzApp {
         } catch (error) {
             console.error('Firebase initialization failed:', error);
             this.isFirebaseInitialized = false;
+        }
+    }
+
+    async initializeExcelHandler() {
+        try {
+            // Initialize Excel Handler with inline class since module import might not work
+            this.excelHandler = new ExcelHandler();
+            console.log('Excel handler initialized');
+        } catch (error) {
+            console.error('Excel handler initialization failed:', error);
+            // Create a simple fallback handler
+            this.excelHandler = {
+                exportToExcel: (data, filename) => {
+                    console.warn('Excel export not available');
+                    this.showMessage('Excel export functionality not available', 'warning');
+                },
+                importFromExcel: () => {
+                    console.warn('Excel import not available');
+                    this.showMessage('Excel import functionality not available', 'warning');
+                }
+            };
         }
     }
 
@@ -105,6 +131,22 @@ class TheiaJewelzApp {
             importFile.addEventListener('change', (e) => this.handleImportSales(e));
         }
 
+        const importCustomersFile = document.getElementById('import-customers-file');
+        if (importCustomersFile) {
+            importCustomersFile.addEventListener('change', (e) => this.handleImportCustomers(e));
+        }
+
+        // Edit form profit calculation
+        const editCostPrice = document.getElementById('edit-cost-price');
+        const editSellingPrice = document.getElementById('edit-selling-price');
+        const editShippingCost = document.getElementById('edit-shipping-cost');
+        
+        if (editCostPrice && editSellingPrice && editShippingCost) {
+            editCostPrice.addEventListener('input', () => this.calculateEditProfit());
+            editSellingPrice.addEventListener('input', () => this.calculateEditProfit());
+            editShippingCost.addEventListener('input', () => this.calculateEditProfit());
+        }
+
         // Set up navigation click handlers
         window.navigateTo = (page) => this.navigateTo(page);
         window.logout = () => this.logout();
@@ -126,6 +168,15 @@ class TheiaJewelzApp {
         window.addNewCustomer = () => this.addNewCustomer();
         window.exportCustomers = () => this.exportCustomers();
         window.importCustomers = () => this.importCustomers();
+        window.deleteSelectedCustomers = () => this.deleteSelectedCustomers();
+        window.deleteAllCustomers = () => this.deleteAllCustomers();
+        window.toggleSelectAllCustomers = () => this.toggleSelectAllCustomers();
+        window.editCustomer = (id) => this.editCustomer(id);
+        window.deleteCustomer = (id) => this.deleteCustomer(id);
+        
+        // Edit sale functions
+        window.closeEditSaleModal = () => this.closeEditSaleModal();
+        window.saveEditedSale = () => this.saveEditedSale();
         
         // Settings functions
         window.openChangePasswordModal = () => this.openChangePasswordModal();
@@ -657,70 +708,142 @@ class TheiaJewelzApp {
         const modal = document.getElementById('receipt-modal');
         const receiptContent = document.getElementById('receipt-content');
         
+        // Calculate total quantity
+        const totalQuantity = receiptData.categories.reduce((sum, cat) => sum + cat.quantity, 0);
+        
+        // Generate receipt number
+        const receiptNumber = `TJ-${Date.now().toString().slice(-6)}`;
+        
         const categoriesHtml = receiptData.categories.map(cat => 
-            `<div class="receipt-row">
-                <span>${cat.category}</span>
-                <span>Qty: ${cat.quantity}</span>
-            </div>`
+            `<tr class="item-row">
+                <td class="item-name">${cat.category}</td>
+                <td class="item-qty">${cat.quantity}</td>
+                <td class="item-price">${this.settings.currency}${(receiptData.sellingPrice / totalQuantity * cat.quantity).toFixed(2)}</td>
+            </tr>`
         ).join('');
 
         receiptContent.innerHTML = `
-            <div class="receipt-header">
-                <h2>Theia Jewelz</h2>
-                <p>Sales Receipt</p>
-                <p>Date: ${this.formatDate(receiptData.saleDate)}</p>
-            </div>
-            
-            <div class="receipt-details">
-                <h3>Customer Details:</h3>
-                <div class="receipt-row">
-                    <span>Name:</span>
-                    <span>${receiptData.customerName}</span>
+            <div class="receipt-container">
+                <!-- Header Section -->
+                <div class="receipt-header">
+                    <div class="company-logo">
+                        <i class="fas fa-gem"></i>
+                    </div>
+                    <h1 class="company-name">THEIA JEWELZ</h1>
+                    <p class="company-tagline">Premium Jewelry Collection</p>
+                    <div class="receipt-info">
+                        <div class="receipt-number">Receipt #: ${receiptNumber}</div>
+                        <div class="receipt-date">Date: ${this.formatDate(receiptData.saleDate)}</div>
+                        <div class="receipt-time">Time: ${new Date().toLocaleTimeString()}</div>
+                    </div>
                 </div>
-                <div class="receipt-row">
-                    <span>Phone:</span>
-                    <span>${receiptData.phoneNumber}</span>
+                
+                <div class="receipt-divider"></div>
+                
+                <!-- Customer Details Section -->
+                <div class="receipt-section">
+                    <h3 class="section-title">
+                        <i class="fas fa-user"></i>
+                        Customer Details
+                    </h3>
+                    <div class="customer-info">
+                        <div class="info-row">
+                            <span class="info-label">Name:</span>
+                            <span class="info-value">${receiptData.customerName}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Phone:</span>
+                            <span class="info-value">${receiptData.phoneNumber}</span>
+                        </div>
+                        ${receiptData.email ? `
+                        <div class="info-row">
+                            <span class="info-label">Email:</span>
+                            <span class="info-value">${receiptData.email}</span>
+                        </div>` : ''}
+                        ${receiptData.address ? `
+                        <div class="info-row">
+                            <span class="info-label">Address:</span>
+                            <span class="info-value">${receiptData.address}</span>
+                        </div>` : ''}
+                    </div>
                 </div>
-                ${receiptData.email ? `<div class="receipt-row"><span>Email:</span><span>${receiptData.email}</span></div>` : ''}
-                ${receiptData.address ? `<div class="receipt-row"><span>Address:</span><span>${receiptData.address}</span></div>` : ''}
-            </div>
-            
-            <div class="receipt-details">
-                <h3>Items:</h3>
-                ${categoriesHtml}
-            </div>
-            
-            <div class="receipt-details">
-                <h3>Payment Details:</h3>
-                <div class="receipt-row">
-                    <span>Cost Price:</span>
-                    <span>${this.settings.currency}${receiptData.costPrice.toFixed(2)}</span>
+                
+                <div class="receipt-divider"></div>
+                
+                <!-- Items Section -->
+                <div class="receipt-section">
+                    <h3 class="section-title">
+                        <i class="fas fa-gem"></i>
+                        Item Details
+                    </h3>
+                    <table class="items-table">
+                        <thead>
+                            <tr>
+                                <th>Item</th>
+                                <th>Qty</th>
+                                <th>Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${categoriesHtml}
+                        </tbody>
+                    </table>
                 </div>
-                <div class="receipt-row">
-                    <span>Selling Price:</span>
-                    <span>${this.settings.currency}${receiptData.sellingPrice.toFixed(2)}</span>
+                
+                <div class="receipt-divider"></div>
+                
+                <!-- Payment Summary Section -->
+                <div class="receipt-section">
+                    <h3 class="section-title">
+                        <i class="fas fa-credit-card"></i>
+                        Payment Summary
+                    </h3>
+                    <div class="payment-details">
+                        <div class="payment-row">
+                            <span class="payment-label">Subtotal:</span>
+                            <span class="payment-value">${this.settings.currency}${receiptData.sellingPrice.toFixed(2)}</span>
+                        </div>
+                        <div class="payment-row">
+                            <span class="payment-label">Shipping:</span>
+                            <span class="payment-value">${this.settings.currency}${receiptData.shippingCost.toFixed(2)}</span>
+                        </div>
+                        <div class="payment-row total-row">
+                            <span class="payment-label">Total Amount:</span>
+                            <span class="payment-value">${this.settings.currency}${(receiptData.sellingPrice + receiptData.shippingCost).toFixed(2)}</span>
+                        </div>
+                        <div class="payment-row">
+                            <span class="payment-label">Payment Mode:</span>
+                            <span class="payment-value payment-mode">${receiptData.paymentMode}</span>
+                        </div>
+                        <div class="payment-row profit-row">
+                            <span class="payment-label">Profit Earned:</span>
+                            <span class="payment-value profit-value">${this.settings.currency}${receiptData.profit.toFixed(2)}</span>
+                        </div>
+                    </div>
                 </div>
-                <div class="receipt-row">
-                    <span>Shipping Cost:</span>
-                    <span>${this.settings.currency}${receiptData.shippingCost.toFixed(2)}</span>
+                
+                <div class="receipt-divider"></div>
+                
+                <!-- Footer Section -->
+                <div class="receipt-footer">
+                    <div class="thank-you">
+                        <i class="fas fa-heart"></i>
+                        <p>Thank you for choosing Theia Jewelz!</p>
+                        <p>We appreciate your business</p>
+                    </div>
+                    <div class="contact-info">
+                        <p><i class="fas fa-phone"></i> Contact: +91-XXXX-XXXXXX</p>
+                        <p><i class="fas fa-envelope"></i> Email: info@theiajewelz.com</p>
+                        <p><i class="fas fa-globe"></i> www.theiajewelz.com</p>
+                    </div>
+                    <div class="receipt-note">
+                        <p><strong>Note:</strong> Please keep this receipt for warranty and exchange purposes.</p>
+                        <p class="warranty-info">All jewelry comes with 1-year warranty against manufacturing defects.</p>
+                    </div>
+                    <div class="receipt-footer-brand">
+                        <p>© 2024 Theia Jewelz - Premium Jewelry Collection</p>
+                    </div>
                 </div>
-                <div class="receipt-row total">
-                    <span>Total Amount:</span>
-                    <span>${this.settings.currency}${(receiptData.sellingPrice + receiptData.shippingCost).toFixed(2)}</span>
-                </div>
-                <div class="receipt-row">
-                    <span>Payment Mode:</span>
-                    <span>${receiptData.paymentMode}</span>
-                </div>
-                <div class="receipt-row">
-                    <span>Profit:</span>
-                    <span>${this.settings.currency}${receiptData.profit.toFixed(2)}</span>
-                </div>
-            </div>
-            
-            <div style="text-align: center; margin-top: 2rem; font-size: 0.9rem; color: #666;">
-                <p>Thank you for your business!</p>
-                <p>© 2024 Theia Jewelz</p>
             </div>
         `;
         
@@ -1571,14 +1694,102 @@ class TheiaJewelzApp {
         }
     }
 
-    exportSales() {
-        // TODO: Implement export functionality
-        this.showMessage('Export functionality coming soon', 'info');
+    async exportSales() {
+        try {
+            if (this.salesData.length === 0) {
+                this.showMessage('No sales data to export', 'warning');
+                return;
+            }
+
+            // Check if XLSX library is available
+            if (typeof XLSX === 'undefined') {
+                this.showMessage('Excel library not loaded. Please refresh the page and try again.', 'error');
+                return;
+            }
+
+            // Prepare data for export
+            const exportData = this.salesData.map(sale => {
+                // Handle categories - convert array to string
+                let categories = '';
+                if (Array.isArray(sale.category)) {
+                    categories = sale.category.map(cat => cat.category || cat).join(', ');
+                } else if (typeof sale.category === 'string') {
+                    categories = sale.category;
+                } else if (sale.category && sale.category.category) {
+                    categories = sale.category.category;
+                }
+
+                return {
+                    'Date': this.formatDate(sale.createdAt || sale.saleDate),
+                    'Receipt Number': sale.receiptNumber || `TJ-${sale.id?.slice(-6) || '000000'}`,
+                    'Customer Name': sale.customerName || '',
+                    'Customer Phone': sale.customerPhone || sale.phoneNumber || '',
+                    'Customer Email': sale.customerEmail || sale.email || '',
+                    'Customer Address': sale.customerAddress || sale.address || '',
+                    'Items': categories,
+                    'Cost Price (₹)': parseFloat(sale.costPrice || 0).toFixed(2),
+                    'Selling Price (₹)': parseFloat(sale.sellingPrice || 0).toFixed(2),
+                    'Shipping Cost (₹)': parseFloat(sale.shippingCost || 0).toFixed(2),
+                    'Total Amount (₹)': (parseFloat(sale.sellingPrice || 0) + parseFloat(sale.shippingCost || 0)).toFixed(2),
+                    'Profit (₹)': parseFloat(sale.profit || 0).toFixed(2),
+                    'Payment Mode': sale.paymentMode || '',
+                    'Sale ID': sale.id || ''
+                };
+            });
+
+            // Create workbook and worksheet
+            const wb = XLSX.utils.book_new();
+            const ws = XLSX.utils.json_to_sheet(exportData);
+
+            // Auto-size columns
+            const range = XLSX.utils.decode_range(ws['!ref']);
+            const cols = [];
+            for (let C = range.s.c; C <= range.e.c; ++C) {
+                let maxWidth = 10;
+                for (let R = range.s.r; R <= range.e.r; ++R) {
+                    const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
+                    const cell = ws[cellAddress];
+                    if (cell && cell.v) {
+                        const cellValue = cell.v.toString();
+                        maxWidth = Math.max(maxWidth, cellValue.length);
+                    }
+                }
+                cols[C] = { wch: Math.min(maxWidth + 2, 50) };
+            }
+            ws['!cols'] = cols;
+
+            // Add worksheet to workbook
+            XLSX.utils.book_append_sheet(wb, ws, 'Sales Data');
+
+            // Generate filename with current date
+            const filename = `Theia_Jewelz_Sales_${new Date().toISOString().split('T')[0]}.xlsx`;
+
+            // Download the file
+            XLSX.writeFile(wb, filename);
+            
+            this.showMessage(`Sales data exported successfully as ${filename}`, 'success');
+        } catch (error) {
+            console.error('Export error:', error);
+            this.showMessage('Failed to export sales data: ' + error.message, 'error');
+        }
     }
 
     importSales() {
-        // TODO: Implement import functionality
-        this.showMessage('Import functionality coming soon', 'info');
+        // Trigger file input click
+        const fileInput = document.getElementById('import-file');
+        if (fileInput) {
+            fileInput.click();
+        } else {
+            // Create a temporary file input if it doesn't exist
+            const tempInput = document.createElement('input');
+            tempInput.type = 'file';
+            tempInput.accept = '.xlsx,.xls';
+            tempInput.style.display = 'none';
+            tempInput.addEventListener('change', (e) => this.handleImportSales(e));
+            document.body.appendChild(tempInput);
+            tempInput.click();
+            document.body.removeChild(tempInput);
+        }
     }
 
     editSale(id) {
@@ -1601,9 +1812,97 @@ class TheiaJewelzApp {
         this.showMessage('Add customer functionality coming soon', 'info');
     }
 
-    exportCustomers() {
-        // TODO: Implement export customers functionality
-        this.showMessage('Export customers functionality coming soon', 'info');
+    async exportCustomers() {
+        try {
+            if (this.customersData.length === 0) {
+                this.showMessage('No customer data to export', 'warning');
+                return;
+            }
+
+            // Check if XLSX library is available
+            if (typeof XLSX === 'undefined') {
+                this.showMessage('Excel library not loaded. Please refresh the page and try again.', 'error');
+                return;
+            }
+
+            // Calculate customer statistics from sales data
+            const customerStats = {};
+            this.salesData.forEach(sale => {
+                const customerId = sale.customerPhone || sale.customerName;
+                if (customerId) {
+                    if (!customerStats[customerId]) {
+                        customerStats[customerId] = {
+                            totalPurchases: 0,
+                            totalSpent: 0,
+                            lastPurchase: null
+                        };
+                    }
+                    customerStats[customerId].totalPurchases++;
+                    customerStats[customerId].totalSpent += parseFloat(sale.sellingPrice || 0);
+                    
+                    const saleDate = new Date(sale.createdAt || sale.saleDate);
+                    if (!customerStats[customerId].lastPurchase || saleDate > customerStats[customerId].lastPurchase) {
+                        customerStats[customerId].lastPurchase = saleDate;
+                    }
+                }
+            });
+
+            // Prepare data for export
+            const exportData = this.customersData.map(customer => {
+                const stats = customerStats[customer.phone] || customerStats[customer.name] || {
+                    totalPurchases: 0,
+                    totalSpent: 0,
+                    lastPurchase: null
+                };
+
+                return {
+                    'Name': customer.name || '',
+                    'Phone': customer.phone || '',
+                    'Email': customer.email || '',
+                    'Address': customer.address || '',
+                    'Total Purchases': stats.totalPurchases,
+                    'Total Spent (₹)': stats.totalSpent.toFixed(2),
+                    'Last Purchase': stats.lastPurchase ? this.formatDate(stats.lastPurchase.toISOString()) : 'Never',
+                    'Customer Since': customer.createdAt ? this.formatDate(customer.createdAt) : 'Unknown',
+                    'Customer ID': customer.id || ''
+                };
+            });
+
+            // Create workbook and worksheet
+            const wb = XLSX.utils.book_new();
+            const ws = XLSX.utils.json_to_sheet(exportData);
+
+            // Auto-size columns
+            const range = XLSX.utils.decode_range(ws['!ref']);
+            const cols = [];
+            for (let C = range.s.c; C <= range.e.c; ++C) {
+                let maxWidth = 10;
+                for (let R = range.s.r; R <= range.e.r; ++R) {
+                    const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
+                    const cell = ws[cellAddress];
+                    if (cell && cell.v) {
+                        const cellValue = cell.v.toString();
+                        maxWidth = Math.max(maxWidth, cellValue.length);
+                    }
+                }
+                cols[C] = { wch: Math.min(maxWidth + 2, 50) };
+            }
+            ws['!cols'] = cols;
+
+            // Add worksheet to workbook
+            XLSX.utils.book_append_sheet(wb, ws, 'Customer Data');
+
+            // Generate filename with current date
+            const filename = `Theia_Jewelz_Customers_${new Date().toISOString().split('T')[0]}.xlsx`;
+
+            // Download the file
+            XLSX.writeFile(wb, filename);
+            
+            this.showMessage(`Customer data exported successfully as ${filename}`, 'success');
+        } catch (error) {
+            console.error('Export error:', error);
+            this.showMessage('Failed to export customer data: ' + error.message, 'error');
+        }
     }
 
     importCustomers() {
@@ -1611,8 +1910,272 @@ class TheiaJewelzApp {
         this.showMessage('Import customers functionality coming soon', 'info');
     }
 
-    handleImportSales(e) {
-        // TODO: Implement import sales from file
-        this.showMessage('Import sales functionality coming soon', 'info');
+    async handleImportSales(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        try {
+            // Check if XLSX library is available
+            if (typeof XLSX === 'undefined') {
+                this.showMessage('Excel library not loaded. Please refresh the page and try again.', 'error');
+                return;
+            }
+
+            this.showLoading(true);
+            this.showMessage('Importing sales data...', 'info');
+
+            // Read the file
+            const data = await this.readExcelFile(file);
+            
+            // Process and validate the data
+            const processedData = this.processSalesImportData(data);
+            
+            if (processedData.length === 0) {
+                this.showMessage('No valid sales data found in the file', 'warning');
+                return;
+            }
+
+            // Add imported data to existing sales
+            let importedCount = 0;
+            let skippedCount = 0;
+
+            processedData.forEach(saleData => {
+                try {
+                    // Generate unique ID
+                    saleData.id = this.generateId();
+                    saleData.createdAt = new Date().toISOString();
+                    
+                    // Add to sales data
+                    this.salesData.push(saleData);
+                    importedCount++;
+                } catch (error) {
+                    console.error('Error processing sale:', error);
+                    skippedCount++;
+                }
+            });
+
+            // Save to storage and update UI
+            this.saveToLocalStorage();
+            this.renderSalesList();
+            this.updateDashboard();
+
+            // Show results
+            let message = `Import completed: ${importedCount} sales imported`;
+            if (skippedCount > 0) {
+                message += `, ${skippedCount} skipped due to errors`;
+            }
+            this.showMessage(message, 'success');
+
+        } catch (error) {
+            console.error('Import error:', error);
+            this.showMessage('Failed to import sales data: ' + error.message, 'error');
+        } finally {
+            this.showLoading(false);
+            // Clear the file input
+            e.target.value = '';
+        }
+    }
+
+    async readExcelFile(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            
+            reader.onload = (e) => {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    
+                    // Get first worksheet
+                    const firstSheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[firstSheetName];
+                    
+                    // Convert to JSON
+                    const jsonData = XLSX.utils.sheet_to_json(worksheet);
+                    resolve(jsonData);
+                } catch (error) {
+                    reject(new Error('Error processing Excel file: ' + error.message));
+                }
+            };
+            
+            reader.onerror = () => {
+                reject(new Error('Error reading file'));
+            };
+            
+            reader.readAsArrayBuffer(file);
+        });
+    }
+
+    processSalesImportData(data) {
+        return data.map(row => {
+            try {
+                // Parse categories
+                let categories = [];
+                const categoryStr = row['Items'] || row['Category'] || row['categories'] || '';
+                if (categoryStr) {
+                    categories = categoryStr.split(',').map(cat => ({
+                        category: cat.trim(),
+                        quantity: 1 // Default quantity
+                    }));
+                }
+
+                // Parse date
+                let saleDate = new Date().toISOString().split('T')[0];
+                if (row['Date']) {
+                    try {
+                        const parsedDate = new Date(row['Date']);
+                        if (!isNaN(parsedDate.getTime())) {
+                            saleDate = parsedDate.toISOString().split('T')[0];
+                        }
+                    } catch (e) {
+                        console.warn('Invalid date format:', row['Date']);
+                    }
+                }
+
+                return {
+                    customerName: row['Customer Name'] || row['customerName'] || '',
+                    customerPhone: row['Customer Phone'] || row['customerPhone'] || row['phoneNumber'] || '',
+                    customerEmail: row['Customer Email'] || row['customerEmail'] || row['email'] || '',
+                    customerAddress: row['Customer Address'] || row['customerAddress'] || row['address'] || '',
+                    category: categories,
+                    costPrice: parseFloat(row['Cost Price (₹)'] || row['Cost Price'] || row['costPrice'] || 0),
+                    sellingPrice: parseFloat(row['Selling Price (₹)'] || row['Selling Price'] || row['sellingPrice'] || 0),
+                    shippingCost: parseFloat(row['Shipping Cost (₹)'] || row['Shipping Cost'] || row['shippingCost'] || 0),
+                    profit: parseFloat(row['Profit (₹)'] || row['Profit'] || row['profit'] || 0),
+                    paymentMode: row['Payment Mode'] || row['paymentMode'] || 'Cash',
+                    saleDate: saleDate,
+                    receiptNumber: row['Receipt Number'] || row['receiptNumber'] || ''
+                };
+            } catch (error) {
+                console.error('Error processing row:', row, error);
+                return null;
+            }
+        }).filter(item => item !== null && item.customerName && item.sellingPrice > 0);
+    }
+
+    // Generate sample Excel template for import
+    generateSalesTemplate() {
+        try {
+            if (typeof XLSX === 'undefined') {
+                this.showMessage('Excel library not loaded. Please refresh the page and try again.', 'error');
+                return;
+            }
+
+            const templateData = [
+                {
+                    'Date': new Date().toLocaleDateString(),
+                    'Customer Name': 'John Doe',
+                    'Customer Phone': '+91-9876543210',
+                    'Customer Email': 'john@example.com',
+                    'Customer Address': '123 Main St, City, State',
+                    'Items': 'Necklaces, Earrings',
+                    'Cost Price (₹)': '1000.00',
+                    'Selling Price (₹)': '1500.00',
+                    'Shipping Cost (₹)': '50.00',
+                    'Profit (₹)': '450.00',
+                    'Payment Mode': 'UPI'
+                },
+                {
+                    'Date': new Date().toLocaleDateString(),
+                    'Customer Name': 'Jane Smith',
+                    'Customer Phone': '+91-9876543211',
+                    'Customer Email': 'jane@example.com',
+                    'Customer Address': '456 Oak Ave, City, State',
+                    'Items': 'Rings, Bracelets',
+                    'Cost Price (₹)': '2000.00',
+                    'Selling Price (₹)': '3000.00',
+                    'Shipping Cost (₹)': '100.00',
+                    'Profit (₹)': '900.00',
+                    'Payment Mode': 'Bank Transfer'
+                }
+            ];
+
+            // Create workbook and worksheet
+            const wb = XLSX.utils.book_new();
+            const ws = XLSX.utils.json_to_sheet(templateData);
+
+            // Auto-size columns
+            const range = XLSX.utils.decode_range(ws['!ref']);
+            const cols = [];
+            for (let C = range.s.c; C <= range.e.c; ++C) {
+                let maxWidth = 10;
+                for (let R = range.s.r; R <= range.e.r; ++R) {
+                    const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
+                    const cell = ws[cellAddress];
+                    if (cell && cell.v) {
+                        const cellValue = cell.v.toString();
+                        maxWidth = Math.max(maxWidth, cellValue.length);
+                    }
+                }
+                cols[C] = { wch: Math.min(maxWidth + 2, 50) };
+            }
+            ws['!cols'] = cols;
+
+            // Add worksheet to workbook
+            XLSX.utils.book_append_sheet(wb, ws, 'Sales Import Template');
+
+            // Download the template
+            XLSX.writeFile(wb, 'Theia_Jewelz_Sales_Import_Template.xlsx');
+            
+            this.showMessage('Sales import template downloaded successfully!', 'success');
+        } catch (error) {
+            console.error('Template generation error:', error);
+            this.showMessage('Failed to generate template: ' + error.message, 'error');
+        }
+    }
+
+    generateCustomersTemplate() {
+        try {
+            if (typeof XLSX === 'undefined') {
+                this.showMessage('Excel library not loaded. Please refresh the page and try again.', 'error');
+                return;
+            }
+
+            const templateData = [
+                {
+                    'Name': 'John Doe',
+                    'Phone': '+91-9876543210',
+                    'Email': 'john@example.com',
+                    'Address': '123 Main St, City, State'
+                },
+                {
+                    'Name': 'Jane Smith',
+                    'Phone': '+91-9876543211',
+                    'Email': 'jane@example.com',
+                    'Address': '456 Oak Ave, City, State'
+                }
+            ];
+
+            // Create workbook and worksheet
+            const wb = XLSX.utils.book_new();
+            const ws = XLSX.utils.json_to_sheet(templateData);
+
+            // Auto-size columns
+            const range = XLSX.utils.decode_range(ws['!ref']);
+            const cols = [];
+            for (let C = range.s.c; C <= range.e.c; ++C) {
+                let maxWidth = 10;
+                for (let R = range.s.r; R <= range.e.r; ++R) {
+                    const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
+                    const cell = ws[cellAddress];
+                    if (cell && cell.v) {
+                        const cellValue = cell.v.toString();
+                        maxWidth = Math.max(maxWidth, cellValue.length);
+                    }
+                }
+                cols[C] = { wch: Math.min(maxWidth + 2, 50) };
+            }
+            ws['!cols'] = cols;
+
+            // Add worksheet to workbook
+            XLSX.utils.book_append_sheet(wb, ws, 'Customer Import Template');
+
+            // Download the template
+            XLSX.writeFile(wb, 'Theia_Jewelz_Customer_Import_Template.xlsx');
+            
+            this.showMessage('Customer import template downloaded successfully!', 'success');
+        } catch (error) {
+            console.error('Template generation error:', error);
+            this.showMessage('Failed to generate template: ' + error.message, 'error');
+        }
     }
 }
