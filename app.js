@@ -718,7 +718,6 @@ class TheiaJewelzApp {
             `<tr class="item-row">
                 <td class="item-name">${cat.category}</td>
                 <td class="item-qty">${cat.quantity}</td>
-                <td class="item-price">${this.settings.currency}${(receiptData.sellingPrice / totalQuantity * cat.quantity).toFixed(2)}</td>
             </tr>`
         ).join('');
 
@@ -730,7 +729,7 @@ class TheiaJewelzApp {
                         <i class="fas fa-gem"></i>
                     </div>
                     <h1 class="company-name">THEIA JEWELZ</h1>
-                    <p class="company-tagline">Premium Jewelry Collection</p>
+                    <p class="company-tagline">Premium Artificial Jewelry Collection</p>
                     <div class="receipt-info">
                         <div class="receipt-number">Receipt #: ${receiptNumber}</div>
                         <div class="receipt-date">Date: ${this.formatDate(receiptData.saleDate)}</div>
@@ -779,9 +778,8 @@ class TheiaJewelzApp {
                     <table class="items-table">
                         <thead>
                             <tr>
-                                <th>Item</th>
-                                <th>Qty</th>
-                                <th>Amount</th>
+                                <th>Item Details</th>
+                                <th>Quantity</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -800,11 +798,11 @@ class TheiaJewelzApp {
                     </h3>
                     <div class="payment-details">
                         <div class="payment-row">
-                            <span class="payment-label">Subtotal:</span>
+                            <span class="payment-label">Total Items Price:</span>
                             <span class="payment-value">${this.settings.currency}${receiptData.sellingPrice.toFixed(2)}</span>
                         </div>
                         <div class="payment-row">
-                            <span class="payment-label">Shipping:</span>
+                            <span class="payment-label">Shipping Cost:</span>
                             <span class="payment-value">${this.settings.currency}${receiptData.shippingCost.toFixed(2)}</span>
                         </div>
                         <div class="payment-row total-row">
@@ -814,10 +812,6 @@ class TheiaJewelzApp {
                         <div class="payment-row">
                             <span class="payment-label">Payment Mode:</span>
                             <span class="payment-value payment-mode">${receiptData.paymentMode}</span>
-                        </div>
-                        <div class="payment-row profit-row">
-                            <span class="payment-label">Profit Earned:</span>
-                            <span class="payment-value profit-value">${this.settings.currency}${receiptData.profit.toFixed(2)}</span>
                         </div>
                     </div>
                 </div>
@@ -831,18 +825,7 @@ class TheiaJewelzApp {
                         <p>Thank you for choosing Theia Jewelz!</p>
                         <p>We appreciate your business</p>
                     </div>
-                    <div class="contact-info">
-                        <p><i class="fas fa-phone"></i> Contact: +91-XXXX-XXXXXX</p>
-                        <p><i class="fas fa-envelope"></i> Email: info@theiajewelz.com</p>
-                        <p><i class="fas fa-globe"></i> www.theiajewelz.com</p>
-                    </div>
-                    <div class="receipt-note">
-                        <p><strong>Note:</strong> Please keep this receipt for warranty and exchange purposes.</p>
-                        <p class="warranty-info">All jewelry comes with 1-year warranty against manufacturing defects.</p>
-                    </div>
-                    <div class="receipt-footer-brand">
-                        <p>© 2024 Theia Jewelz - Premium Jewelry Collection</p>
-                    </div>
+
                 </div>
             </div>
         `;
@@ -1727,11 +1710,10 @@ class TheiaJewelzApp {
                     'Customer Email': sale.customerEmail || sale.email || '',
                     'Customer Address': sale.customerAddress || sale.address || '',
                     'Items': categories,
-                    'Cost Price (₹)': parseFloat(sale.costPrice || 0).toFixed(2),
-                    'Selling Price (₹)': parseFloat(sale.sellingPrice || 0).toFixed(2),
+                    'Price (₹)': parseFloat(sale.sellingPrice || 0).toFixed(2),
                     'Shipping Cost (₹)': parseFloat(sale.shippingCost || 0).toFixed(2),
                     'Total Amount (₹)': (parseFloat(sale.sellingPrice || 0) + parseFloat(sale.shippingCost || 0)).toFixed(2),
-                    'Profit (₹)': parseFloat(sale.profit || 0).toFixed(2),
+
                     'Payment Mode': sale.paymentMode || '',
                     'Sale ID': sale.id || ''
                 };
@@ -1793,8 +1775,34 @@ class TheiaJewelzApp {
     }
 
     editSale(id) {
-        // TODO: Implement edit functionality
-        this.showMessage('Edit functionality coming soon', 'info');
+        const sale = this.salesData.find(s => s.id === id);
+        if (!sale) {
+            this.showMessage('Sale not found', 'error');
+            return;
+        }
+
+        this.editingSaleId = id;
+        
+        // Populate the edit form
+        document.getElementById('edit-sale-id').value = sale.id;
+        document.getElementById('edit-customer-name').value = sale.customerName || '';
+        document.getElementById('edit-phone-number').value = sale.customerPhone || sale.phoneNumber || '';
+        document.getElementById('edit-email').value = sale.customerEmail || sale.email || '';
+        document.getElementById('edit-address').value = sale.customerAddress || sale.address || '';
+        document.getElementById('edit-sale-date').value = this.formatDateForInput(sale.createdAt || sale.saleDate);
+        document.getElementById('edit-cost-price').value = sale.costPrice || '';
+        document.getElementById('edit-selling-price').value = sale.sellingPrice || '';
+        document.getElementById('edit-shipping-cost').value = sale.shippingCost || '0';
+        document.getElementById('edit-payment-mode').value = sale.paymentMode || 'UPI';
+        
+        // Populate categories
+        this.populateEditCategories(sale.category);
+        
+        // Calculate profit
+        this.calculateEditProfit();
+        
+        // Show the modal
+        document.getElementById('edit-sale-modal').style.display = 'flex';
     }
 
     deleteSale(id) {
@@ -2176,6 +2184,156 @@ class TheiaJewelzApp {
         } catch (error) {
             console.error('Template generation error:', error);
             this.showMessage('Failed to generate template: ' + error.message, 'error');
+        }
+    }
+
+    // Helper functions for edit functionality
+    formatDateForInput(dateString) {
+        if (!dateString) return new Date().toISOString().split('T')[0];
+        const date = new Date(dateString);
+        return date.toISOString().split('T')[0];
+    }
+
+    populateEditCategories(categories) {
+        const container = document.getElementById('edit-categories-container');
+        if (!container) return;
+
+        // Clear existing content
+        container.innerHTML = '';
+
+        // Create category checkboxes
+        this.categories.forEach(category => {
+            const categoryItem = document.createElement('div');
+            categoryItem.className = 'category-item';
+            
+            const isSelected = Array.isArray(categories) ? 
+                categories.some(cat => (cat.category || cat).toLowerCase() === category.toLowerCase()) :
+                false;
+            
+            const quantity = isSelected && Array.isArray(categories) ? 
+                categories.find(cat => (cat.category || cat).toLowerCase() === category.toLowerCase())?.quantity || 1 : 1;
+
+            categoryItem.innerHTML = `
+                <input type="checkbox" id="edit-cat-${category}" name="categories" value="${category}" ${isSelected ? 'checked' : ''}>
+                <label for="edit-cat-${category}">${category.charAt(0).toUpperCase() + category.slice(1)}</label>
+                <input type="number" id="edit-qty-${category}" name="quantities" min="1" placeholder="Qty" 
+                       value="${isSelected ? quantity : ''}" ${!isSelected ? 'disabled' : ''}>
+            `;
+            
+            container.appendChild(categoryItem);
+
+            // Add event listener for checkbox
+            const checkbox = categoryItem.querySelector(`#edit-cat-${category}`);
+            const quantityInput = categoryItem.querySelector(`#edit-qty-${category}`);
+            
+            checkbox.addEventListener('change', (e) => {
+                quantityInput.disabled = !e.target.checked;
+                if (e.target.checked) {
+                    quantityInput.value = '1';
+                    quantityInput.focus();
+                } else {
+                    quantityInput.value = '';
+                }
+            });
+        });
+    }
+
+    calculateEditProfit() {
+        const costPrice = parseFloat(document.getElementById('edit-cost-price').value) || 0;
+        const sellingPrice = parseFloat(document.getElementById('edit-selling-price').value) || 0;
+        const shippingCost = parseFloat(document.getElementById('edit-shipping-cost').value) || 0;
+        
+        const profit = sellingPrice - costPrice - shippingCost;
+        document.getElementById('edit-profit').value = profit.toFixed(2);
+    }
+
+    closeEditSaleModal() {
+        document.getElementById('edit-sale-modal').style.display = 'none';
+        this.editingSaleId = null;
+    }
+
+    saveEditedSale() {
+        if (!this.editingSaleId) {
+            this.showMessage('No sale selected for editing', 'error');
+            return;
+        }
+
+        try {
+            // Get form data
+            const form = document.getElementById('edit-sale-form');
+            const formData = new FormData(form);
+            
+            // Get selected categories
+            const selectedCategories = [];
+            this.categories.forEach(category => {
+                const checkbox = document.getElementById(`edit-cat-${category}`);
+                const quantityInput = document.getElementById(`edit-qty-${category}`);
+                
+                if (checkbox && checkbox.checked) {
+                    selectedCategories.push({
+                        category: category,
+                        quantity: parseInt(quantityInput.value) || 1
+                    });
+                }
+            });
+
+            if (selectedCategories.length === 0) {
+                this.showMessage('Please select at least one category', 'error');
+                return;
+            }
+
+            // Validate required fields
+            const customerName = formData.get('customerName');
+            const phoneNumber = formData.get('phoneNumber');
+            const costPrice = parseFloat(formData.get('costPrice'));
+            const sellingPrice = parseFloat(formData.get('sellingPrice'));
+
+            if (!customerName || !phoneNumber || !costPrice || !sellingPrice) {
+                this.showMessage('Please fill in all required fields', 'error');
+                return;
+            }
+
+            // Find and update the sale
+            const saleIndex = this.salesData.findIndex(sale => sale.id === this.editingSaleId);
+            if (saleIndex === -1) {
+                this.showMessage('Sale not found', 'error');
+                return;
+            }
+
+            // Update sale data
+            const updatedSale = {
+                ...this.salesData[saleIndex],
+                customerName: customerName,
+                customerPhone: phoneNumber,
+                customerEmail: formData.get('email') || '',
+                customerAddress: formData.get('address') || '',
+                phoneNumber: phoneNumber, // Keep both for compatibility
+                email: formData.get('email') || '',
+                address: formData.get('address') || '',
+                category: selectedCategories,
+                costPrice: costPrice,
+                sellingPrice: sellingPrice,
+                shippingCost: parseFloat(formData.get('shippingCost')) || 0,
+                profit: parseFloat(document.getElementById('edit-profit').value) || 0,
+                paymentMode: formData.get('paymentMode') || 'UPI',
+                saleDate: formData.get('saleDate'),
+                updatedAt: new Date().toISOString()
+            };
+
+            this.salesData[saleIndex] = updatedSale;
+
+            // Save to storage and update UI
+            this.saveToLocalStorage();
+            this.renderSalesList();
+            this.updateDashboard();
+
+            // Close modal and show success message
+            this.closeEditSaleModal();
+            this.showMessage('Sale updated successfully!', 'success');
+
+        } catch (error) {
+            console.error('Error saving edited sale:', error);
+            this.showMessage('Failed to save changes: ' + error.message, 'error');
         }
     }
 }
