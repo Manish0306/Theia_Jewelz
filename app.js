@@ -1280,9 +1280,28 @@ class TheiaJewelzApp {
                 this.selectedSales.delete(saleId);
             }
             
+            // Update delete button state
             const deleteBtn = document.getElementById('delete-selected');
             if (deleteBtn) {
                 deleteBtn.disabled = this.selectedSales.size === 0;
+            }
+            
+            // Update select all checkbox state
+            const totalCheckboxes = document.querySelectorAll('#sales-table-body input[type="checkbox"]').length;
+            const selectedCount = this.selectedSales.size;
+            
+            const selectAllCheckbox = document.getElementById('select-all');
+            const headerCheckbox = document.getElementById('header-checkbox');
+            
+            // If all items are selected, check the select all checkbox
+            // If no items or some items are selected, uncheck the select all checkbox
+            const shouldBeChecked = selectedCount === totalCheckboxes && totalCheckboxes > 0;
+            
+            if (selectAllCheckbox) {
+                selectAllCheckbox.checked = shouldBeChecked;
+            }
+            if (headerCheckbox) {
+                headerCheckbox.checked = shouldBeChecked;
             }
         };
     }
@@ -1298,34 +1317,73 @@ class TheiaJewelzApp {
     }
 
     renderCustomersList() {
-        const customersList = document.getElementById('customers-list');
-        if (!customersList) return;
+        const tableBody = document.getElementById('customers-table-body');
+        if (!tableBody) return;
 
         if (this.customersData.length === 0) {
-            customersList.innerHTML = '<div style="text-align: center; padding: 2rem;">No customers data available</div>';
+            tableBody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 2rem;">No customers data available</td></tr>';
             return;
         }
 
-        customersList.innerHTML = this.customersData.map(customer => {
+        tableBody.innerHTML = this.customersData.map(customer => {
             const customerSales = this.salesData.filter(sale => sale.phoneNumber === customer.phone);
             const totalSpent = customerSales.reduce((sum, sale) => sum + (sale.sellingPrice || 0), 0);
             const purchaseCount = customerSales.length;
 
             return `
-                <div class="customer-item">
-                    <div class="customer-info">
-                        <h4>${customer.name}</h4>
-                        <p><i class="fas fa-phone"></i> ${customer.phone}</p>
-                        ${customer.email ? `<p><i class="fas fa-envelope"></i> ${customer.email}</p>` : ''}
-                        ${customer.address ? `<p><i class="fas fa-map-marker-alt"></i> ${customer.address}</p>` : ''}
-                    </div>
-                    <div class="customer-stats">
-                        <span class="purchase-count">${purchaseCount} purchase${purchaseCount !== 1 ? 's' : ''}</span>
-                        <span class="total-spent">${this.settings.currency}${totalSpent.toFixed(2)}</span>
-                    </div>
-                </div>
+                <tr>
+                    <td><input type="checkbox" value="${customer.id || customer.phone}" onchange="toggleCustomerSelection('${customer.id || customer.phone}')"></td>
+                    <td><strong>${customer.name}</strong></td>
+                    <td>${customer.phone}</td>
+                    <td>${customer.email || '-'}</td>
+                    <td>${customer.address || '-'}</td>
+                    <td>${purchaseCount}</td>
+                    <td>${this.settings.currency}${totalSpent.toFixed(2)}</td>
+                    <td>
+                        <button class="btn btn-sm btn-secondary" onclick="editCustomer('${customer.id || customer.phone}')" title="Edit">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="btn btn-sm btn-danger" onclick="deleteCustomer('${customer.id || customer.phone}')" title="Delete">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                </tr>
             `;
         }).join('');
+
+        // Add global function for customer selection
+        window.toggleCustomerSelection = (customerId) => {
+            const checkbox = document.querySelector(`#customers-table-body input[value="${customerId}"]`);
+            if (checkbox.checked) {
+                this.selectedCustomers.add(customerId);
+            } else {
+                this.selectedCustomers.delete(customerId);
+            }
+            
+            // Update delete button state
+            const deleteBtn = document.getElementById('delete-selected-customers');
+            if (deleteBtn) {
+                deleteBtn.disabled = this.selectedCustomers.size === 0;
+            }
+            
+            // Update select all checkbox state
+            const totalCheckboxes = document.querySelectorAll('#customers-table-body input[type="checkbox"]').length;
+            const selectedCount = this.selectedCustomers.size;
+            
+            const selectAllCheckbox = document.getElementById('select-all-customers');
+            const headerCheckbox = document.getElementById('customers-header-checkbox');
+            
+            // If all items are selected, check the select all checkbox
+            // If no items or some items are selected, uncheck the select all checkbox
+            const shouldBeChecked = selectedCount === totalCheckboxes && totalCheckboxes > 0;
+            
+            if (selectAllCheckbox) {
+                selectAllCheckbox.checked = shouldBeChecked;
+            }
+            if (headerCheckbox) {
+                headerCheckbox.checked = shouldBeChecked;
+            }
+        };
     }
 
     // Settings Functions
@@ -1658,13 +1716,75 @@ class TheiaJewelzApp {
     }
 
     toggleSelectAll() {
-        // TODO: Implement select all logic
-        console.log('Toggle select all');
+        const selectAllCheckbox = document.getElementById('select-all') || document.getElementById('header-checkbox');
+        const salesCheckboxes = document.querySelectorAll('#sales-table-body input[type="checkbox"]');
+        const deleteBtn = document.getElementById('delete-selected');
+        
+        if (!selectAllCheckbox) return;
+        
+        const isChecked = selectAllCheckbox.checked;
+        
+        // Clear current selection
+        this.selectedSales.clear();
+        
+        // Update all checkboxes and selection
+        salesCheckboxes.forEach(checkbox => {
+            checkbox.checked = isChecked;
+            if (isChecked) {
+                this.selectedSales.add(checkbox.value);
+            }
+        });
+        
+        // Sync both select all checkboxes if they exist
+        const otherSelectAllCheckbox = selectAllCheckbox.id === 'select-all' 
+            ? document.getElementById('header-checkbox')
+            : document.getElementById('select-all');
+        
+        if (otherSelectAllCheckbox) {
+            otherSelectAllCheckbox.checked = isChecked;
+        }
+        
+        // Update delete button state
+        if (deleteBtn) {
+            deleteBtn.disabled = this.selectedSales.size === 0;
+        }
+        
+        console.log(`Select all toggled: ${isChecked ? 'checked' : 'unchecked'}, Selected items: ${this.selectedSales.size}`);
     }
 
     deleteSelected() {
-        // TODO: Implement delete selected logic
-        this.showMessage('Selected items deleted', 'success');
+        if (this.selectedSales.size === 0) {
+            this.showMessage('No items selected', 'warning');
+            return;
+        }
+        
+        const selectedCount = this.selectedSales.size;
+        const confirmMessage = `Are you sure you want to delete ${selectedCount} selected sale${selectedCount > 1 ? 's' : ''}? This action cannot be undone.`;
+        
+        if (confirm(confirmMessage)) {
+            // Remove selected sales from salesData
+            this.salesData = this.salesData.filter(sale => !this.selectedSales.has(sale.id));
+            
+            // Clear selection
+            this.selectedSales.clear();
+            
+            // Update UI
+            this.saveToLocalStorage();
+            this.renderSalesList();
+            this.updateDashboard();
+            
+            // Reset select all checkboxes
+            const selectAllCheckbox = document.getElementById('select-all');
+            const headerCheckbox = document.getElementById('header-checkbox');
+            if (selectAllCheckbox) selectAllCheckbox.checked = false;
+            if (headerCheckbox) headerCheckbox.checked = false;
+            
+            // Disable delete button
+            const deleteBtn = document.getElementById('delete-selected');
+            if (deleteBtn) deleteBtn.disabled = true;
+            
+            this.showMessage(`${selectedCount} sale${selectedCount > 1 ? 's' : ''} deleted successfully`, 'success');
+        }
     }
 
     deleteAll() {

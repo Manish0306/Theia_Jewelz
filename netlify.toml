@@ -1,0 +1,12 @@
+# Redirect all routes to index.html for SPA routing
+[[redirects]]
+from = "/*"
+to = "/index.html"
+status = 200
+
+# Proxy API requests to an external backend
+[[redirects]]
+from = "/api/*"
+to = "https://your-backend-url.com/api/:splat"
+status = 200
+force = true
